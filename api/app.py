@@ -217,7 +217,10 @@ async def delete_expense(dailyexpense_id: int):
 async def add_expense(expensetype_id: int, expense_details: daily_expense_pydantic_in):
     expense_type = await ExpenseType.get(id = expensetype_id)
     expense_details = expense_details.dict(exclude_unset = True)
-    expense_details["amount"] = expense_details["quantity_purchased"] * expense_details["unit_price"]
+    if expense_details["unit_price"] > 0 and expense_details["amount"] == 0: 
+       expense_details["amount"] = expense_details["quantity_purchased"] * expense_details["unit_price"]
+    elif expense_details["amount"] > 0 and expense_details["unit_price"] == 0:
+       expense_details["amount"] = expense_details["amount"]
     expense_obj = await DailyExpense.create(**expense_details, expense_type = expense_type)
     response = await daily_expense_pydantic.from_tortoise_orm(expense_obj)
     return {"status": "OK", "data": response}
@@ -230,7 +233,10 @@ async def update_expense(dailyexpense_id: int, expensetype_id : int, update_info
      daily_expense.name = update_info['name']
      daily_expense.quantity_purchased = update_info['quantity_purchased']
      daily_expense.unit_price =  update_info['unit_price']
-     daily_expense.amount = update_info['quantity_purchased'] * update_info['unit_price']
+     if update_info['unit_price'] > 0 and update_info['amount'] == 0:
+        daily_expense.amount = update_info['quantity_purchased'] * update_info['unit_price']
+     elif update_info['amount'] > 0 and update_info['unit_price'] == 0:
+        daily_expense.amount = update_info['amount']
      daily_expense.really_needed = update_info['really_needed']  
      await daily_expense.save()
      response = await daily_expense_pydantic.from_tortoise_orm(daily_expense)

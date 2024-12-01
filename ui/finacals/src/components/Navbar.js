@@ -1,28 +1,21 @@
 import {react, useContext, useState} from "react";
 import {Navbar, Nav, Form, FormControl, Button, Badge} from 'react-bootstrap';
 import {Link} from  "react-router-dom";
-import {ProductContext} from "../ProductContext";
+import { ExpenseTypeContext } from "../ExpenseTypeContext";
 
 const NavBar = () => {
     const [search, setSearch] = useState("");
-    const [products, setProducts] = useContext(ProductContext);
+    const [expenseType, setExpenseType] = useContext(ExpenseTypeContext);
     
     const updateSearch = (e) => {
         setSearch(e.target.value);
     }
-    const filterProduct = (e) => {
-        e.preventDefault();
-        if (!products || !products.data) return;
-        const product = products.data.filter(
-            product => product.name.toLowerCase() === 
-            search.toLowerCase())
-        setProducts({"data": [...product]})
-    }
+   
     return(
         <Navbar bg="dark" expand="lg" variant="dark">
         <div className="container-fluid">
           {/* Brand */}
-          <Navbar.Brand href="#home">Inventory Management App</Navbar.Brand>
+          <Navbar.Brand href="#home">Money Tracker App</Navbar.Brand>
   
           {/* Toggle for Small Screens */}
           <Navbar.Toggle aria-controls="navbar-nav" />
@@ -31,22 +24,21 @@ const NavBar = () => {
           <Navbar.Collapse id="navbar-nav">
             <Nav className="mr-auto align-items-center">
               {/* Badge */}
-              <Badge  bg="primary" className="ml-2 me-3">
-                Products In Stock {products.data.length}
-              </Badge>
+              
             </Nav>
   
             {/* Right-Side Form */}
             <Form className="d-flex align-items-center" 
             style={{ width: '70%' }}
-            onSubmit={filterProduct}>
-              {/* Add Product Button */}
+            // onSubmit={filterProduct}
+            >
+              Add New Expense
               <Link
-                to="/addproduct"
+                to="/addexpense"
                 className="btn btn-primary btn-sm me-3"
                 style={{ whiteSpace: 'nowrap' }}
               >
-                Add Product
+                Add Expense
               </Link>
   
               {/* Search Bar */}
@@ -62,7 +54,7 @@ const NavBar = () => {
               {/* Search Button */}
               <Button type="submit" 
               variant="outline-primary"
-            //   onChange={updateSearch}
+              onChange={updateSearch}
               >
                 Search
               </Button>
