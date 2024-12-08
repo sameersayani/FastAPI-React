@@ -1,3 +1,5 @@
+from datetime import datetime
+from pydantic import BaseModel
 from tortoise.models import Model
 from tortoise import fields
 from tortoise.contrib.pydantic import pydantic_model_creator
@@ -22,6 +24,24 @@ class Supplier(Model):
 class ExpenseType(Model):
     id = fields.IntField(pk=True)
     name = fields.CharField(max_length=100)
+
+class DailyExpenseCreate(BaseModel):
+    date: datetime
+    name: str
+    quantity_purchased: int = 1
+    unit_price: float = 0.00
+    amount: float = 0.00
+    really_needed: bool = False
+    expense_type_id: int 
+
+class DailyExpenseUpdate(BaseModel):
+    date: datetime  
+    name: str
+    quantity_purchased: int = 1
+    unit_price: float = 0.00
+    amount: float = 0.00
+    really_needed: bool = False
+    expense_type_id: int  # Expecting this in the payload
 
 class DailyExpense(Model):
     id = fields.IntField(pk=True)

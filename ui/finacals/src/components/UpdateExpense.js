@@ -1,81 +1,266 @@
-import react, { useContext, useState} from 'react'
-import { Form, Button, Card } from 'react-bootstrap'
-import {UpdateContext} from '../UpdateExpenseContext'
+import React, { useEffect, useState } from "react";
+import { useUpdateExpenseContext } from "../UpdateExpenseContext";
+import ExpenseTypeist from "./ExpenseType";
+import DatePicker from "./DatePicker";
 
-const UpdateExpense= () => {
-    const [updateExpenseInfo, setUpdateExpenseInfo] = useContext(UpdateContext);
+const UpdateExpenseForm = ({ id, onCancel }) => {
+  const { expenseData, loadExpense, updateExpense } = useUpdateExpenseContext();
+  const [formData, setFormData] = useState({
+    date: "",
+    name: "",
+    quantity_purchased: 1,
+    unit_price: 0,
+    amount: 0,
+    really_needed: false,
+    expense_type: null,
+  });
+  const [selectedExpenseTypeId, setSelectedExpenseTypeId] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [errors, setErrors] = useState({});
+  const [successMessage, setSuccessMessage] = useState("");
 
-    // Ensure controlled values
-    const controlledValues = {
-        ExpenseDate: updateExpenseInfo.ExpenseDate,
-        ProductName: updateExpenseInfo.ProductName || "",
-        QuantityInStock: updateExpenseInfo.QuantityPurchased || "0",
-        UnitPrice: updateExpenseInfo.UnitPrice || "0",
-        Amount: updateExpenseInfo.Amount || "0",
-        ReallyNeeded: updateExpenseInfo.ReallyNeeded || "0",
-        Id: updateExpenseInfo.Id || ""
-    };
+  useEffect(() => {
+    console.log('expenseId received:', id);
+    if (id && !expenseData) {
+        loadExpense(id);
+    }
+  }, [id, expenseData, loadExpense]);
 
-    const updateForm = (e) => {
-        setUpdateExpenseInfo({ ...updateExpenseInfo, [e.target.name]: e.target.value });
-    };
+  useEffect(() => {
+    console.log('Expense data received:', expenseData);
+    if (expenseData) {
+      const { date, name, quantity_purchased, unit_price, amount, really_needed, expense_type } = expenseData.data;
+      setFormData({
+        date: date ? date.split("T")[0] : "" || "",
+        name: name || "",
+        quantity_purchased: quantity_purchased || 1,
+        unit_price: unit_price || 0,
+        amount: amount || 0,
+        really_needed: really_needed || false,
+        expense_type: expense_type?.id || null,
+        //expenseId: expenseData.id
+      });
+    }
+  }, [expenseData]);
 
-    const postData = async (e) => {
-        e.preventDefault();
+    // Don't render the form until expenseData is available
+    if (loading) {
+        return <p>Loading...</p>; // Show a loading indicator
+        }
 
-        const url = `http://localhost:8000/dailyexpense/${updateExpenseInfo.Id}`;
+  const handleInputChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+    setErrors((prev) => ({ ...prev, [name]: "" }));
+  };
 
-        const response = await fetch(url, {
-            method: "PUT",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                date: controlledValues.date,
-                name: controlledValues.ProductName,
-                quantity_purchased: controlledValues.QuantityInStock,
-                unit_price: controlledValues.UnitPrice,
-                amount: controlledValues.Amount,
-                really_needed: controlledValues.ReallyNeeded,
-            }),
-        });
+  const handleExpenseTypeChange = (typeId) => {
+    setFormData((prev) => ({ ...prev, expense_type: typeId }));
+    setSelectedExpenseTypeId(typeId);
+    setErrors((prev) => ({ ...prev, expense_type: "" }));
+  };
 
-        const resp = await response.json();
-        alert(resp.status === "OK" ? "Expense details updated" : "Failed to update expense details");
+  const handleDateChange = (selectedDate) => {
+    setFormData((prev) => ({ ...prev, date: selectedDate }));
+    setErrors((prev) => ({ ...prev, date: "" }));
+  };
 
-        setUpdateExpenseInfo({
-            ExpenseDate: "",
-            ProductName: "",
-            QuantityPurchased: "",
-            UnitPrice: "",
-            Amount: "",
-            ReallyNeeded: ""
-        });
-    };
+  const validateForm = () => {
+    const newErrors = {};
 
-    return (
-        <Card>
-            <Card.Body>
-                <Form onSubmit={postData}>
-                    {Object.keys(controlledValues).map((key) => (
-                        <Form.Group key={key} controlId={key}>
-                            <Form.Label>{key.replace(/([A-Z])/g, " $1")}</Form.Label>
-                            <Form.Control
-                                type="text"
-                                name={key}
-                                value={controlledValues[key]}
-                                onChange={updateForm}
-                                placeholder={key}
-                            />
-                        </Form.Group>
-                    ))}
-                    <Button variant="primary" type="submit">
-                        Submit
-                    </Button>
-                </Form>
-            </Card.Body>
-        </Card>
-    );
+    if (!formData.expense_type) newErrors.expense_type = "Select from expense category.";
+    if (!formData.date) newErrors.date = "Date is required.";
+    if (!formData.name) newErrors.name = "Product or service name is required.";
+    if (formData.unit_price <= 0 && formData.amount <= 0) {
+      newErrors.unit_price = "Unit price or amount must be greater than 0.";
+      newErrors.amount = "Unit price or amount must be greater than 0.";
+    }
+    if (formData.quantity_purchased <= 0) {
+      newErrors.quantity_purchased = "Quantity must be greater than 0.";
+    }
+
+    return newErrors;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const validationErrors = validateForm();
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    setSuccessMessage("");
+
+    try {
+        // const updatedData = {
+        //     ...expenseData, // Spread existing fields
+        //     expense_type_id: selectedExpenseTypeId || expenseData?.expense_type?.id, // Use the selected ID or fallback
+        //   };
+      //await updateExpense(expenseData.data?.id, formData.expense_type, formData);
+      const updatedData = {
+        date: formData.date,
+        name: formData.name,
+        quantity_purchased: formData.quantity_purchased,
+        unit_price: formData.unit_price,
+        amount: formData.amount,
+        really_needed: formData.really_needed,
+        expense_type_id: selectedExpenseTypeId || formData.expense_type, // Ensure this is properly set
+      };
+      await updateExpense(expenseData.data?.id, updatedData);
+      setSuccessMessage("Expense updated successfully!");
+      if (onCancel) onCancel();
+    } catch (err) {
+        alert(err)
+      setError("Failed to update expense.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="p-4">
+      <h2 className="text-lg font-semibold mb-4">Update Expense</h2>
+
+      {error && <p className="text-red-500 mb-2">{error}</p>}
+      {successMessage && <p className="text-green-500 mb-2">{successMessage}</p>}
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Expense Type */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Expense Type
+          </label>
+          <ExpenseTypeist
+            onExpenseTypeChange={handleExpenseTypeChange}
+            selectedType={formData.expense_type}
+          />
+          {errors.expense_type && (
+            <p className="text-red-500 text-sm">{errors.expense_type}</p>
+          )}
+        </div>
+
+        {/* Date */}
+        <div>
+          <DatePicker
+            selectedDate={formData.date}
+            onChange={handleDateChange}
+          />
+          {errors.date && <p className="text-red-500 text-sm">{errors.date}</p>}
+        </div>
+
+        {/* Name */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Name
+          </label>
+          <input
+            type="text"
+            name="name"
+            value={formData.name}
+            onChange={handleInputChange}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+          />
+          {errors.name && <p className="text-red-500 text-sm">{errors.name}</p>}
+        </div>
+
+        {/* Quantity */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Quantity Purchased
+          </label>
+          <input
+            type="number"
+            name="quantity_purchased"
+            value={formData.quantity_purchased}
+            onChange={handleInputChange}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+          />
+          {errors.quantity_purchased && (
+            <p className="text-red-500 text-sm">{errors.quantity_purchased}</p>
+          )}
+        </div>
+
+        {/* Unit Price */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Unit Price
+          </label>
+          <input
+            type="number"
+            name="unit_price"
+            value={formData.unit_price}
+            onChange={handleInputChange}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+          />
+        </div>
+
+        {/* Amount */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Amount
+          </label>
+          <input
+            type="number"
+            name="amount"
+            value={formData.amount}
+            onChange={handleInputChange}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+          />
+        </div>
+
+        {/* Really Needed */}
+        <div className="flex items-center space-x-4">
+          <div>
+            <label className="text-sm font-medium text-gray-700">Really Needed?</label>
+          </div>
+          <label className="flex items-center space-x-2">
+            <input
+              type="radio"
+              name="really_needed"
+              value="true"
+              onChange={handleInputChange}
+              checked={formData.really_needed === true}
+            />
+            <span>Yes</span>
+          </label>
+          <label className="flex items-center space-x-2">
+            <input
+              type="radio"
+              name="really_needed"
+              value="false"
+              onChange={handleInputChange}
+              checked={formData.really_needed === false}
+            />
+            <span>No</span>
+          </label>
+        </div>
+
+        <div className="flex space-x-4">
+          <button
+            type="submit"
+            disabled={loading}
+            className="bg-blue-500 text-white px-4 py-2 rounded-md"
+          >
+            {loading ? "Updating..." : "Update"}
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="bg-gray-300 text-black px-4 py-2 rounded-md"
+          >
+            Cancel
+          </button>
+        </div>
+      </form>             
+    </div>
+  );
 };
 
-export default UpdateExpense;
+export default UpdateExpenseForm;

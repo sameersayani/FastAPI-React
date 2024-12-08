@@ -5,7 +5,8 @@ import { ExpenseTypeProvider } from "./ExpenseTypeContext";
 import AddExpenseForm from "./components/AddExpense";
 import { ExpenseProvider } from "./ExpenseContext";
 import ExpensesList from "./components/ExpensesList";
-import { UpdateExpenseContextProvider } from "./UpdateExpenseContext";
+import { UpdateExpenseProvider } from "./UpdateExpenseContext";
+import UpdateExpenseForm from "./components/UpdateExpense";
 
 function App() {
   return (
@@ -17,10 +18,14 @@ function App() {
             <div className="row">
               <div className="col-sm-10 col-xm-12 mr-auto ml-auto mt-4 mb-4">
                 <ExpenseProvider>
-                  <UpdateExpenseContextProvider>
+                  <UpdateExpenseProvider>
                     <Route exact path="/" component={ExpensesList} />
                     <Route exact path="/addExpense" component={AddExpenseForm} />
-                  </UpdateExpenseContextProvider>
+                    {/* <Route exact path="/updateExpense/:expenseId" render={(props) => (
+                      <UpdateExpenseForm {...props} />
+                    )} /> */}
+                    <Route exact path="/updateExpense/:id" component={UpdateExpenseForm} />
+                  </UpdateExpenseProvider>
                   </ExpenseProvider>
                   {/* <Route exact path="/addExpense" component={AddProducts} />
                   <Route exact path="/updateproduct" component={UpdateProduct} />

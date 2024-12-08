@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import "./css/ExpenseType.css";
 
-const ExpenseTypeList = ({ onExpenseTypeChange }) => {
+const ExpenseTypeList = ({ onExpenseTypeChange, selectedType }) => {
   const [expenseTypes, setExpenseTypes] = useState([]);
   const [error, setError] = useState(null);
 
@@ -37,9 +37,11 @@ const ExpenseTypeList = ({ onExpenseTypeChange }) => {
             className="flex items-center space-x-2 p-2 rounded-md border hover:bg-blue-50 cursor-pointer"
           >
             <input
+              id={`expense-type-${type.id}`}
               type="radio"
               name="expense_type"
               value={type.id}
+              checked={selectedType === type.id} // Check if this radio button should be selected
               onChange={() => onExpenseTypeChange(type.id)}
               className="form-radio text-blue-500 focus:ring-blue-500"
             />

@@ -1,6 +1,6 @@
-from fastapi import FastAPI, Depends
-from tortoise.contrib.fastapi import register_tortoise
-from models import (supplier_pydantic, supplier_pydantic_in, Supplier, 
+from fastapi import FastAPI, APIRouter, HTTPException
+from tortoise.contrib.fastapi import register_tortoise, HTTPNotFoundError
+from models import (DailyExpenseUpdate, supplier_pydantic, supplier_pydantic_in, Supplier, 
                     product_pydantic, product_pydantic_in, Product,
                     expensetpye_pydantic, expensetpye_pydantic_in, ExpenseType,
                     daily_expense_pydantic, daily_expense_pydantic_in, DailyExpense, DailyExpenseWithExpenseType)
@@ -181,7 +181,8 @@ async def app_expensetype(expensetype_info: expensetpye_pydantic_in):
      expensetype_obj = await ExpenseType.create(**expensetype_info.dict(exclude_unset=True))
      response = await expensetpye_pydantic.from_tortoise_orm(expensetype_obj)
      return {"status": "OK", "data" : response}
- 
+
+router = APIRouter() 
 @app.put("/expensetype/{expensetype_id}")
 async def update_expensetype(expensetype_id: int, update_info: expensetpye_pydantic_in):
      expensetype =  await ExpenseType.get(id=expensetype_id)
@@ -225,22 +226,42 @@ async def add_expense(expensetype_id: int, expense_details: daily_expense_pydant
     response = await daily_expense_pydantic.from_tortoise_orm(expense_obj)
     return {"status": "OK", "data": response}
 
-@app.put("/dailyexpense/{dailyexpense_id}/expensetype/{expensetype_id}")
-async def update_expense(dailyexpense_id: int, expensetype_id : int, update_info: daily_expense_pydantic_in):
-     daily_expense = await DailyExpense.get(id = dailyexpense_id)
-     update_info = update_info.dict(exclude_unset=True)
-     daily_expense.expense_type =  await ExpenseType.get(id = expensetype_id)
-     daily_expense.name = update_info['name']
-     daily_expense.quantity_purchased = update_info['quantity_purchased']
-     daily_expense.unit_price =  update_info['unit_price']
-     if update_info['unit_price'] > 0 and update_info['amount'] == 0:
-        daily_expense.amount = update_info['quantity_purchased'] * update_info['unit_price']
-     elif update_info['amount'] > 0 and update_info['unit_price'] == 0:
-        daily_expense.amount = update_info['amount']
-     daily_expense.really_needed = update_info['really_needed']  
-     await daily_expense.save()
-     response = await daily_expense_pydantic.from_tortoise_orm(daily_expense)
-     return {"status": "OK", "data" : response} 
+@app.put("/dailyexpense/{expense_id}")
+async def update_daily_expense(expense_id: int, expense: DailyExpenseUpdate):
+    db_expense = await DailyExpense.get_or_none(id=expense_id)
+    if not expense:
+        raise HTTPException(status_code=404, detail="Expense not found")
+
+#     formatted_date = expense.date.strftime("%Y-%m-%d")
+    # Update fields, including expense_type_id
+    print(f"Expense: {expense}")
+    db_expense.date = expense.date
+    db_expense.name = expense.name
+    db_expense.quantity_purchased = expense.quantity_purchased
+    db_expense.unit_price = expense.unit_price
+    db_expense.amount = expense.amount
+    db_expense.really_needed = expense.really_needed
+    db_expense.expense_type_id = expense.expense_type_id  # Update the foreign key
+
+    await db_expense.save()
+    return db_expense
+
+# @app.put("/dailyexpense/{dailyexpense_id}")
+# async def update_expense(dailyexpense_id: int, update_info: daily_expense_pydantic_in):
+#      daily_expense = await DailyExpense.get(id = dailyexpense_id)
+#      update_info = update_info.dict(exclude_unset=True)
+#      daily_expense.expense_type = await ExpenseType.get(id = daily_expense.expensetype_id)
+#      daily_expense.name = update_info['name']
+#      daily_expense.quantity_purchased = update_info['quantity_purchased']
+#      daily_expense.unit_price =  update_info['unit_price']
+#      if update_info['unit_price'] > 0 and update_info['amount'] == 0:
+#         daily_expense.amount = update_info['quantity_purchased'] * update_info['unit_price']
+#      elif update_info['amount'] > 0 and update_info['unit_price'] == 0:
+#         daily_expense.amount = update_info['amount']
+#      daily_expense.really_needed = update_info['really_needed']  
+#      await daily_expense.save()
+#      response = await daily_expense_pydantic.from_tortoise_orm(daily_expense)
+#      return {"status": "OK", "data" : response} 
 
 register_tortoise(
     app,

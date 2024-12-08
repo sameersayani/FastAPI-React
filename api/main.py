@@ -1,9 +1,11 @@
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, APIRouter
 from fastapi.templating import Jinja2Templates
 from starlette.requests import Request
 
 app = FastAPI()
+# router = APIRouter()
+# app.include_router(router)
 
 templates = Jinja2Templates(directory="templates")
 
