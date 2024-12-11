@@ -1,8 +1,10 @@
 import React, { useState } from "react";
 import ExpenseTypeist from "./ExpenseType";
 import DatePicker from "./DatePicker";
+import { useHistory } from "react-router-dom";
 
 const AddExpenseForm = () => {
+  const history = useHistory();
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split("T")[0],
     name: "",
@@ -10,6 +12,7 @@ const AddExpenseForm = () => {
     unit_price: 0,
     amount: 0,
     really_needed: false,
+    expense_type: null,
   });
 
   const [loading, setLoading] = useState(false);
@@ -44,6 +47,10 @@ const AddExpenseForm = () => {
       really_needed: value === "true", 
     });
     setErrors({ ...errors, really_needed: "" });
+  };
+
+  const handleCancel = () => {
+    history.push("/");
   };
 
   const validateForm = () => {
@@ -101,6 +108,7 @@ const AddExpenseForm = () => {
         amount: 0,
         really_needed: false,
       });
+      history.push("/");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -121,7 +129,7 @@ const AddExpenseForm = () => {
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Select Expense Type
           </label>
-          <ExpenseTypeist onExpenseTypeChange={handleExpenseTypeChange} />
+          <ExpenseTypeist onExpenseTypeChange={handleExpenseTypeChange} selectedType={formData.expense_type} />
           {errors.expense_type && (
           <p className="text-red-500 text-sm">{errors.expense_type}</p>
         )}
@@ -222,6 +230,7 @@ const AddExpenseForm = () => {
           </label>
         </div>
         </div>
+        <div className="flex space-x-4">
         <button
           type="submit"
           className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
@@ -229,6 +238,14 @@ const AddExpenseForm = () => {
         >
           {loading ? "Saving..." : "Add Expense"}
         </button>
+        <button
+            type="button"
+            onClick={handleCancel}
+            className="bg-gray-300 text-black px-4 py-2 rounded-md"
+          >
+            Cancel
+          </button>
+          </div>
       </form>
     </div>
   );

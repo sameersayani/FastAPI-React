@@ -176,6 +176,11 @@ async def get_expensetype():
      response = await expensetpye_pydantic.from_queryset(ExpenseType.all().order_by("name", "name"))
      return {"status": "OK", "data" : response}
 
+@app.get("/expensetype/{expensetype_id}")
+async def get_expensetype_by_id(expensetype_id: int):
+     response = await expensetpye_pydantic.from_queryset_single(ExpenseType.filter(id=expensetype_id).first())
+     return {"status": "OK", "data" : response}
+
 @app.post('/expensetype')
 async def app_expensetype(expensetype_info: expensetpye_pydantic_in):
      expensetype_obj = await ExpenseType.create(**expensetype_info.dict(exclude_unset=True))

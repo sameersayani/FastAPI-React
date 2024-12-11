@@ -1,38 +1,55 @@
-import React, { useEffect, useContext } from "react";
+import React, { useEffect, useContext, useState } from "react";
 import { Table } from "react-bootstrap";
 import { useHistory } from "react-router-dom";
 import { ExpenseTypeContext } from "../ExpenseTypeContext";
 import { ExpenseContext } from "../ExpenseContext";
 import ExpenseRow from "./Expenses";
 import { useUpdateExpenseContext } from "../UpdateExpenseContext";
+import ConfirmDeleteModal from "./ConfirmDeleteModal";
 
 const ExpensesList = () => {
   const [expenseType, setExpenseType] = useContext(ExpenseTypeContext);
   const [expenses, setExpenses] = useContext(ExpenseContext);
+  const [expenseToDelete, setExpenseToDelete] = useState(null);
   const { loadExpense } = useUpdateExpenseContext(); // Use loadExpense from the context
-
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  
   let history = useHistory();
 
-  const handleDelete = (id) => {
-    fetch("http://127.0.0.1:8000/dailyexpense/" + id, {
+  const openModal = (expenseId) => {
+    const expense = expenses.data.find((expense) => expense.id === expenseId);
+    setExpenseToDelete(expense);
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setExpenseToDelete(null);
+  };
+
+  const handleDelete = () => {
+    if (!expenseToDelete) return;
+
+    fetch(`http://127.0.0.1:8000/dailyexpense/${expenseToDelete.id}`, {
       method: "DELETE",
       headers: {
-        accept: "application/json",
+        "Content-Type": "application/json",
       },
     })
-      .then((response) => {
-        return response.json();
-      })
+      .then((response) => response.json())
       .then((result) => {
         if (result.status === "OK") {
-          const filteredExpenses = expenses.data.filter(
-            (expense) => expense.id !== id
+          const updatedExpenses = expenses.data.filter(
+            (expense) => expense.id !== expenseToDelete.id
           );
-          setExpenses({ data: [...filteredExpenses] });
-          alert("Expense deleted");
+          setExpenses({ ...expenses, data: updatedExpenses });
         } else {
-          alert("Expense deletion failed !");
+          alert("Failed to delete the expense !");
         }
+      })
+      .catch((error) => console.error("Error:", error))
+      .finally(() => {
+        closeModal(); // Close the modal after operation
       });
   };
 
@@ -63,6 +80,7 @@ const ExpensesList = () => {
             <th>Unit Price</th>
             <th>Amount</th>
             <th>Really Needed?</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -78,10 +96,18 @@ const ExpensesList = () => {
               key={expense.id}
               handleDelete={handleDelete}
               handleUpdate={handleUpdate}
+              openModal={openModal}
             />
           ))}
         </tbody>
       </Table>
+       {/* Confirm Delete Modal */}
+       <ConfirmDeleteModal
+        isOpen={isModalOpen}
+        onClose={closeModal}
+        onConfirm={handleDelete}
+        itemName={expenseToDelete?.name || "this item"}
+      />
     </div>
   );
 };
