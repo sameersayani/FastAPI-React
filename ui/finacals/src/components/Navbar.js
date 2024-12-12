@@ -2,6 +2,8 @@ import {react, useContext, useState} from "react";
 import {Navbar, Nav, Form, FormControl, Button, Badge} from 'react-bootstrap';
 import {Link} from  "react-router-dom";
 import { ExpenseTypeContext } from "../ExpenseTypeContext";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faIndianRupeeSign } from '@fortawesome/free-solid-svg-icons';
 
 const NavBar = () => {
     const [search, setSearch] = useState("");
@@ -15,7 +17,9 @@ const NavBar = () => {
         <Navbar bg="dark" expand="lg" variant="dark">
         <div className="container-fluid">
           {/* Brand */}
-          <Navbar.Brand href="#home">Money Tracker App</Navbar.Brand>
+          <Navbar.Brand href="/">
+              <FontAwesomeIcon icon={faIndianRupeeSign} style={{ paddingLeft: '10px', fontSize:'2em' }}  />
+          </Navbar.Brand>
   
           {/* Toggle for Small Screens */}
           <Navbar.Toggle aria-controls="navbar-nav" />
@@ -45,8 +49,8 @@ const NavBar = () => {
               <FormControl
                 type="text"
                 placeholder="Search"
-                className="me-2"
-                style={{ minWidth: '200px' }}
+                className="me-3"
+                style={{ minWidth: '10px' }}
                 value={search}
                 onChange={updateSearch}
               />
