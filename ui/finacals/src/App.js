@@ -14,10 +14,11 @@ function App() {
       <Router>
         <Switch>
           <ExpenseTypeProvider>
+          <ExpenseProvider>
             <NavBar />
             <div className="row">
               <div className="col-sm-10 col-xm-12 mr-auto ml-auto mt-4 mb-4">
-                <ExpenseProvider>
+
                   <UpdateExpenseProvider>
                     <Route exact path="/" component={ExpensesList} />
                     <Route exact path="/addExpense" component={AddExpenseForm} />
@@ -26,12 +27,12 @@ function App() {
                     )} /> */}
                     <Route exact path="/updateExpense/:id" component={UpdateExpenseForm} />
                   </UpdateExpenseProvider>
-                  </ExpenseProvider>
                   {/* <Route exact path="/addExpense" component={AddProducts} />
                   <Route exact path="/updateproduct" component={UpdateProduct} />
                   <Route exact path="/supplierpage" component={SupplierPage} /> */}
               </div>
             </div>
+            </ExpenseProvider>
           </ExpenseTypeProvider>
         </Switch>
       </Router>

@@ -1,18 +1,25 @@
 import {react, useContext, useState} from "react";
 import {Navbar, Nav, Form, FormControl, Button, Badge} from 'react-bootstrap';
 import {Link} from  "react-router-dom";
-import { ExpenseTypeContext } from "../ExpenseTypeContext";
+import { ExpenseContext } from "../ExpenseContext";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faIndianRupeeSign } from '@fortawesome/free-solid-svg-icons';
 
 const NavBar = () => {
     const [search, setSearch] = useState("");
-    const [expenseType, setExpenseType] = useContext(ExpenseTypeContext);
+    const [expenses, setExpenses] = useContext(ExpenseContext);
     
     const updateSearch = (e) => {
         setSearch(e.target.value);
     }
-   
+    
+    const filterExpense = (e) => {
+      e.preventDefault()
+      const expense = expenses?.data?.filter(expense => 
+        expense?.name?.toLowerCase().startsWith(search?.toLowerCase())) || [];
+      setExpenses({"data" : [...expense]})
+  }
+
     return(
         <Navbar bg="dark" expand="lg" variant="dark">
         <div className="container-fluid">
@@ -27,15 +34,14 @@ const NavBar = () => {
           {/* Collapsible Content */}
           <Navbar.Collapse id="navbar-nav">
             <Nav className="mr-auto align-items-center">
-              {/* Badge */}
-              
+              <Badge className="mt-2" variant="primary">Items purchased {expenses?.data?.length || 0}</Badge>
             </Nav>
   
             {/* Right-Side Form */}
             <Form className="d-flex align-items-center" 
             style={{ width: '70%' }}
-            // onSubmit={filterProduct}
-            >
+            onSubmit={filterExpense}
+            inline="true">
               Add New Expense
               <Link
                 to="/addexpense"
@@ -45,7 +51,7 @@ const NavBar = () => {
                 Add Expense
               </Link>
   
-              {/* Search Bar */}
+              Search Bar
               <FormControl
                 type="text"
                 placeholder="Search"
