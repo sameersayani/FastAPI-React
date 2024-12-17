@@ -22,6 +22,9 @@ credentials = dotenv_values(".env")
 
 #CORS
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
+from googleauth import router as google_auth_router
+import os
 
 class EmailSchema(BaseModel):
     email: List[EmailStr]
@@ -42,17 +45,25 @@ conf = ConnectionConfig(
     VALIDATE_CERTS = True
 )
 
+# Ensure SECRET_KEY is defined in your .env file
+SECRET_KEY = os.getenv("SECRET_KEY", "1ab49bf5-efe3-4dd4-a24f-465391d2a1f6")
 app = FastAPI()
+# Add SessionMiddleware
+app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
+# Include the auth router
+app.include_router(google_auth_router, prefix="/api", tags=["Authentication"])
 
 #adding CORS urls
 origins = [
+     "http://127.0.0.1:8000",
+     "http://localhost:8000"
      "http://localhost:3000"
 ]
 
 #add middleware
 app.add_middleware(
      CORSMiddleware,
-     allow_origins = origins,
+     allow_origins = ["*"],
      allow_credentials = True,
      allow_methods = ["*"],
      allow_headers = ["*"]
@@ -60,10 +71,10 @@ app.add_middleware(
 
 templates = Jinja2Templates(directory="templates")
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-GOOGLE_CLIENT_ID = credentials["GOOGLE_CLIENT_ID"]
-GOOGLE_CLIENT_SECRET = credentials["GOOGLE_CLIENT_SECRET"]
-GOOGLE_REDIRECT_URI = credentials["GOOGLE_REDIRECT_URI"]
+# oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+# GOOGLE_CLIENT_ID = credentials["GOOGLE_CLIENT_ID"]
+# GOOGLE_CLIENT_SECRET = credentials["GOOGLE_CLIENT_SECRET"]
+# GOOGLE_REDIRECT_URI = credentials["GOOGLE_REDIRECT_URI"]
 
 
 # @app.get('/')
@@ -251,22 +262,19 @@ async def update_daily_expense(expense_id: int, expense: DailyExpenseUpdate):
     await db_expense.save()
     return db_expense
 
-# @app.put("/dailyexpense/{dailyexpense_id}")
-# async def update_expense(dailyexpense_id: int, update_info: daily_expense_pydantic_in):
-#      daily_expense = await DailyExpense.get(id = dailyexpense_id)
-#      update_info = update_info.dict(exclude_unset=True)
-#      daily_expense.expense_type = await ExpenseType.get(id = daily_expense.expensetype_id)
-#      daily_expense.name = update_info['name']
-#      daily_expense.quantity_purchased = update_info['quantity_purchased']
-#      daily_expense.unit_price =  update_info['unit_price']
-#      if update_info['unit_price'] > 0 and update_info['amount'] == 0:
-#         daily_expense.amount = update_info['quantity_purchased'] * update_info['unit_price']
-#      elif update_info['amount'] > 0 and update_info['unit_price'] == 0:
-#         daily_expense.amount = update_info['amount']
-#      daily_expense.really_needed = update_info['really_needed']  
-#      await daily_expense.save()
-#      response = await daily_expense_pydantic.from_tortoise_orm(daily_expense)
-#      return {"status": "OK", "data" : response} 
+# Override Swagger UI to include OAuth2 settings
+@app.get("/docs", include_in_schema=False)
+async def custom_swagger_ui():
+    return get_swagger_ui_html(
+        openapi_url=app.openapi_url,
+        title="Custom Swagger with Google OAuth2",
+        oauth2_redirect_url="http://127.0.0.1:8000/api/auth/callback",
+    )
+
+# Include the OpenAPI redirect route for Swagger OAuth2
+@app.get("/oauth2-redirect", include_in_schema=False)
+async def oauth2_redirect():
+    return {"message": "Swagger OAuth2 Redirect"}
 
 register_tortoise(
     app,

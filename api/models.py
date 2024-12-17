@@ -53,7 +53,14 @@ class DailyExpense(Model):
     really_needed = fields.BooleanField(default = False)
     expense_type = fields.ForeignKeyField('models.ExpenseType', 
                                          related_name="typeof_expense")
+
+class UserInfo(BaseModel):
+    sub: str
+    email: str
+    name: str
+    picture: str
     
+
 #create pydantic models
 product_pydantic = pydantic_model_creator(Product, name="Product")
 product_pydantic_in = pydantic_model_creator(Product, name="ProductIn", exclude_readonly=True)
