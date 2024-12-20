@@ -2,10 +2,10 @@ import React, { useEffect, useState } from "react";
 import { useUpdateExpenseContext } from "../UpdateExpenseContext";
 import ExpenseTypeist from "./ExpenseType";
 import DatePicker from "./DatePicker";
-import { useHistory } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 const UpdateExpenseForm = ({ id, onCancel }) => {
-  const history = useHistory();
+  const navigate = useNavigate();
   const { expenseData, loadExpense, updateExpense } = useUpdateExpenseContext();
   const [formData, setFormData] = useState({
     date: "",
@@ -72,7 +72,7 @@ const UpdateExpenseForm = ({ id, onCancel }) => {
   };
 
   const handleCancel = () => {
-    history.push("/");
+    navigate("/");
   };
 
   const validateForm = () => {
@@ -122,7 +122,7 @@ const UpdateExpenseForm = ({ id, onCancel }) => {
       await updateExpense(expenseData.data?.id, updatedData);
       setSuccessMessage("Expense updated successfully!");
       
-      history.push("/");
+      navigate("/");
     } catch (err) {
         alert(err)
       setError("Failed to update expense.");

@@ -46,18 +46,18 @@ conf = ConnectionConfig(
 )
 
 # Ensure SECRET_KEY is defined in your .env file
-SECRET_KEY = os.getenv("SECRET_KEY", "1ab49bf5-efe3-4dd4-a24f-465391d2a1f6")
+SECRET_KEY = os.getenv("SECRET_KEY", "db11adfd7f008dcd8347e47fff1734bd77a59c80a4ad8ff2")
 app = FastAPI()
 # Add SessionMiddleware
-app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
+app.add_middleware(SessionMiddleware, secret_key="db11adfd7f008dcd8347e47fff1734bd77a59c80a4ad8ff2")
 # Include the auth router
 app.include_router(google_auth_router, prefix="/api", tags=["Authentication"])
 
 #adding CORS urls
 origins = [
      "http://127.0.0.1:8000",
-     "http://localhost:8000"
-     "http://localhost:3000"
+     "http://127.0.0.1:8000"
+     "http://127.0.0.1:3000"
 ]
 
 #add middleware

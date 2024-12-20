@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import ExpenseTypeist from "./ExpenseType";
 import DatePicker from "./DatePicker";
-import { useHistory } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 const AddExpenseForm = () => {
-  const history = useHistory();
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split("T")[0],
     name: "",
@@ -50,7 +50,7 @@ const AddExpenseForm = () => {
   };
 
   const handleCancel = () => {
-    history.push("/");
+    navigate("/");
   };
 
   const validateForm = () => {
@@ -108,7 +108,7 @@ const AddExpenseForm = () => {
         amount: 0,
         really_needed: false,
       });
-      history.push("/");
+      navigate("/");
     } catch (err) {
       setError(err.message);
     } finally {

@@ -1,6 +1,6 @@
 import React, { useEffect, useContext, useState } from "react";
 import { Table } from "react-bootstrap";
-import { useHistory } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { ExpenseTypeContext } from "../ExpenseTypeContext";
 import { ExpenseContext } from "../ExpenseContext";
 import ExpenseRow from "./Expenses";
@@ -14,7 +14,7 @@ const ExpensesList = () => {
   const { loadExpense } = useUpdateExpenseContext(); // Use loadExpense from the context
   const [isModalOpen, setIsModalOpen] = useState(false);
   
-  let history = useHistory();
+  let navigate = useNavigate();
 
   const openModal = (expenseId) => {
     const expense = expenses.data.find((expense) => expense.id === expenseId);
@@ -56,7 +56,7 @@ const ExpensesList = () => {
   const handleUpdate = (id) => {
     // Load the selected expense data by ID
     loadExpense(id); // Use loadExpense to populate the context with the data
-    history.push(`/updateexpense/${id}`); // Navigate to the Update Expense page
+    navigate(`/updateexpense/${id}`); // Navigate to the Update Expense page
   };
 
   useEffect(() => {
