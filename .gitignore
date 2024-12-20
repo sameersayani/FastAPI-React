@@ -4,3 +4,5 @@ api/__pycache__/main.cpython-313.pyc
 api/__pycache__/models.cpython-313.pyc
 api/sqlite3.exe
 api/node_modules/
+api/venv
+api/sqlite3.exe
