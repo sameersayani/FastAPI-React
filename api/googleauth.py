@@ -1,3 +1,4 @@
+import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse
 from authlib.integrations.starlette_client import OAuth
@@ -76,20 +77,22 @@ router = APIRouter()
 # Helper function to simulate Google Login and Redirect
 @router.get("/auth/login", tags=["Authentication"])
 async def login(request: Request):
-    state = "example_state_value"
+    state = str(uuid.uuid4())
     request.session["state"] = state
     redirect_uri = "http://127.0.0.1:8000/api/auth/callback"
     google_auth_url = (
         f"https://accounts.google.com/o/oauth2/auth?"
-        f"response_type=code&client_id=YOUR_CLIENT_ID&redirect_uri={redirect_uri}&scope=openid%20email%20profile&state={state}"
+        f"response_type=code&client_id={GOOGLE_CLIENT_ID}&redirect_uri={redirect_uri}&scope=openid%20email%20profile&state={state}"
     )
-    return RedirectResponse(google_auth_url)
+    print("google_auth_url", google_auth_url);
+    return RedirectResponse(google_auth_url);
 
 @router.get("/auth/callback", tags=["Authentication"])
 async def callback(request: Request):
     # Simulate state checking here
     state_received = request.query_params.get("state")
     state_stored = request.session.get("state")
+    print(f"State stored: {state_stored}, State received: {state_received}")
     if state_received != state_stored:
         return {"error": "State mismatch"}
     return {"message": "Google Authentication Successful"}
