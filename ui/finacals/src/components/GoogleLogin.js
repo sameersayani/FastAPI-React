@@ -4,7 +4,7 @@ import axios from "axios";
 const GoogleLogin = ({ setIsAuthenticated }) => {
   const handleGoogleLogin = async () => {
     try {
-      const redirectUri = "http://127.0.0.1:3000/api/auth/callback"; // React app callback
+      const redirectUri = 'http://127.0.0.1:3000/api/auth/callback'; // React app callback
       const response = await axios.get(`http://127.0.0.1:8000/api/auth/login`, {
         params: { redirect_uri: redirectUri },
       });
@@ -12,7 +12,7 @@ const GoogleLogin = ({ setIsAuthenticated }) => {
       // Redirect user to Google authentication URL
       window.location.href = response.data.url;
     } catch (error) {
-      console.error("Login failed:", error);
+      console.error("Login failed:", error.response?.data || error.message);
     }
   };
 

@@ -49,25 +49,24 @@ conf = ConnectionConfig(
 SECRET_KEY = os.getenv("SECRET_KEY", "db11adfd7f008dcd8347e47fff1734bd77a59c80a4ad8ff2")
 app = FastAPI()
 # Add SessionMiddleware
-app.add_middleware(SessionMiddleware, secret_key="db11adfd7f008dcd8347e47fff1734bd77a59c80a4ad8ff2")
+app.add_middleware(SessionMiddleware, secret_key="db11adfd7f008dcd8347e47fff1734bd77a59c80a4ad8ff2", https_only=False)
 # Include the auth router
 app.include_router(google_auth_router, prefix="/api", tags=["Authentication"])
 
-#adding CORS urls
-origins = [
-     "http://127.0.0.1:8000",
-     "http://127.0.0.1:8000"
-     "http://127.0.0.1:3000"
-]
+# #adding CORS urls
+# origins = [
+#      "http://127.0.0.1:3000",
+#      "http://127.0.0.1:8000"
+# ]
 
-#add middleware
-app.add_middleware(
-     CORSMiddleware,
-     allow_origins = ["*"],
-     allow_credentials = True,
-     allow_methods = ["*"],
-     allow_headers = ["*"]
-)
+# #add middleware
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=["http://localhost:3000"],  # React app URL
+#     allow_credentials=True,
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
 
 templates = Jinja2Templates(directory="templates")
 

@@ -1,28 +1,24 @@
-import uuid
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import RedirectResponse
-from authlib.integrations.starlette_client import OAuth
-from starlette.requests import Request
-from dotenv import load_dotenv
 import os
-from fastapi import FastAPI, APIRouter, Depends, Request
-from fastapi.security import OAuth2AuthorizationCodeBearer
-from fastapi.openapi.docs import get_swagger_ui_html
-import jwt
-from datetime import datetime, timedelta
 import random
 import string
+import jwt
+from datetime import datetime, timedelta
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import RedirectResponse
+from fastapi.security import OAuth2AuthorizationCodeBearer
+from authlib.integrations.starlette_client import OAuth
+from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
 
-# Fetch configuration
+# Fetch configuration from environment variables
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
-SECRET_KEY = os.getenv("SECRET_KEY")
+SECRET_KEY = os.getenv("SECRET_KEY", "your_default_secret_key")
 
 if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET or not SECRET_KEY:
-    raise RuntimeError("Missing required environment variables")
+    raise RuntimeError("Missing required environment variables: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, SECRET_KEY")
 
 # Initialize OAuth
 oauth = OAuth()
@@ -30,115 +26,101 @@ google = oauth.register(
     name="google",
     client_id=GOOGLE_CLIENT_ID,
     client_secret=GOOGLE_CLIENT_SECRET,
-    server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+    access_token_url="https://accounts.google.com/o/oauth2/token",
+    authorize_url="https://accounts.google.com/o/oauth2/auth",
     client_kwargs={"scope": "openid email profile"},
 )
 
-# # In-memory session storage (for demonstration)
-# user_sessions = {}
+# Router for authentication endpoints
+router = APIRouter()
 
-# OAuth2 scheme
+# OAuth2 scheme for protected routes
 oauth2_scheme = OAuth2AuthorizationCodeBearer(
     authorizationUrl="https://accounts.google.com/o/oauth2/auth",
-    tokenUrl="https://oauth2.googleapis.com/token",
+    tokenUrl="https://accounts.google.com/o/oauth2/token",
     scopes={"openid": "OpenID Connect scope"},
 )
 
-# Create APIRouter instance
-router = APIRouter()
+# JWT Configuration
+JWT_ALGORITHM = "HS256"
+JWT_EXPIRATION_HOURS = 1  # Adjust the token expiry as needed
 
 
-# @router.get("/api/auth/login")
-# async def login(request: Request):
-#     state = generate_state()
-#     request.session["state"] = state
-#     print(f"State set in session: {state}")
-#     redirect_uri = f"https://oauth2provider.com/auth?state={state}&redirect_uri=http://127.0.0.1:8000/api/auth/callback"
-#     return RedirectResponse(redirect_uri)
+def create_jwt(user_info: dict) -> str:
+    """Generate a JWT token for authenticated users."""
+    payload = {
+        "sub": user_info.get("email"),
+        "name": user_info.get("name"),
+        "exp": datetime.utcnow() + timedelta(hours=JWT_EXPIRATION_HOURS),
+    }
+    token = jwt.encode(payload, SECRET_KEY, algorithm=JWT_ALGORITHM)
+    return token
 
-# @router.get("/api/auth/callback")
-# async def callback(request: Request):
-#     state_received = request.query_params.get("state")
-#     state_stored = request.session.get("state")
-#     print(f"State received: {state_received}, State stored: {state_stored}")
 
-#     if state_received != state_stored:
-#         raise HTTPException(status_code=400, detail="CSRF attack detected")
-#     return {"message": "OAuth authentication successful"}
-
-# @router.get("/auth/logout", summary="Logout user")
-# async def logout(user_id: str):
-#     user_sessions.pop(user_id, None)
-#     return {"message": "Logged out successfully"}
-
-# @router.get("/protected", summary="Protected endpoint")
-# async def protected_endpoint(user_id: str):
-#     user = user_sessions.get(user_id)
-#     if not user:
-#         raise HTTPException(status_code=401, detail="Unauthorized")
-#     return {"message": "This is a protected route", "user": user}
-
-# Helper function to simulate Google Login and Redirect
-def generate_state():
-    """Generate a random state string"""
+def generate_state() -> str:
+    """Generate a random state string for CSRF protection."""
     return ''.join(random.choices(string.ascii_letters + string.digits, k=16))
 
+
 @router.get("/auth/login", tags=["Authentication"])
-async def login(request: Request):
+async def login(request: Request, redirect_uri: str):
+    """
+    Redirect users to Google for authentication.
+    Query Parameter:
+    - `redirect_uri`: The URL where users are redirected after authentication.
+    """
+    redirect_uri = request.query_params.get("redirect_uri")
+    if not redirect_uri:
+        raise HTTPException(status_code=400, detail="Missing redirect_uri parameter")
+
     state = generate_state()
-    request.session["state"] = state
-    redirect_uri = "http://127.0.0.1:8000/api/auth/callback"
-    google_auth_url = (
-        f"https://accounts.google.com/o/oauth2/auth?"
-        f"response_type=code&client_id={GOOGLE_CLIENT_ID}&redirect_uri={redirect_uri}"
-        f"&scope=openid%20email%20profile&state={state}"
-    )
-    print("google_auth_url", google_auth_url);
-    return RedirectResponse(google_auth_url) 
+    request.session["state"] = state  # Store state in the session for CSRF protection
+    return await oauth.google.authorize_redirect(request, redirect_uri)
+
 
 @router.get("/auth/callback", tags=["Authentication"])
 async def callback(request: Request):
+    """
+    Handle the OAuth2 callback from Google.
+    Query Parameters:
+    - `state`: State to verify CSRF protection.
+    - `code`: Authorization code to exchange for an access token.
+    """
     state_received = request.query_params.get("state")
-    state_stored = request.session.get("state")
-    print(f"Received state: {state_received}, Stored state: {state_stored}")
-
-    if state_received != state_stored:
-        raise HTTPException(status_code=400, detail="State mismatch")
-
     code = request.query_params.get("code")
+
+    # Validate the state to prevent CSRF attacks
+    state_stored = request.session.get("state")
+    if state_received != state_stored:
+        raise HTTPException(status_code=400, detail="State mismatch (CSRF detected)")
+
     if not code:
         raise HTTPException(status_code=400, detail="Missing authorization code")
 
-    # Exchange the code for tokens
-    token = await oauth.google.authorize_access_token(request)
-    user_info = token.get("userinfo")  # Extract user info from the token
-    if not user_info:
-        raise HTTPException(status_code=400, detail="Missing user info in the token")
+    try:
+        # Exchange the authorization code for an access token
+        token = await oauth.google.authorize_access_token(request)
 
-    # Create a JWT token for your application
-    jwt_token = create_jwt(user_info)  # Implement your JWT creation logic here
+        # Extract user info from the token
+        user_info = token.get("userinfo")
+        if not user_info:
+            raise HTTPException(status_code=400, detail="Failed to fetch user information")
 
-    return {"access_token": jwt_token, "user_info": user_info}
+        # Generate a JWT for the user
+        jwt_token = create_jwt(user_info)
 
-# Protected Route
+        return {"access_token": jwt_token, "user_info": user_info}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Authentication failed: {str(e)}")
+
+
 @router.get("/protected", tags=["Protected"], dependencies=[Depends(oauth2_scheme)])
 async def protected():
+    """Protected endpoint accessible only to authenticated users."""
     return {"message": "You are authenticated and can access this endpoint!"}
 
-# Define your secret key and algorithm
-JWT_SECRET = os.getenv("SECRET_KEY", "db11adfd7f008dcd8347e47fff1734bd77a59c80a4ad8ff2")
-JWT_ALGORITHM = "HS256"
 
-def create_jwt(user_info: dict):
-    """Create a JWT token for the authenticated user."""
-    payload = {
-        "sub": user_info["email"],  # Use the user's email as the subject
-        "name": user_info.get("name"),
-        "exp": datetime.utcnow() + timedelta(hours=1)
-    }
-    token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-    return token
-
-@router.get("/test")
+@router.get("/test", tags=["Test"])
 async def test_route():
+    """Test route to verify the server is running correctly."""
     return {"message": "Test route is working"}
