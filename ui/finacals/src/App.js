@@ -8,6 +8,7 @@ import ExpensesList from "./components/ExpensesList";
 import { UpdateExpenseProvider } from "./UpdateExpenseContext";
 import UpdateExpenseForm from "./components/UpdateExpense";
 import GoogleLogin from "./components/GoogleLogin"; 
+import Dashboard from "./components/Dashboard";
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -56,7 +57,7 @@ function App() {
 
   return (
     <div>
-      {isAuthenticated ? (
+      {/* {isAuthenticated ? ( */}
         <ExpenseTypeProvider>
           <ExpenseProvider>
             <NavBar />
@@ -67,17 +68,18 @@ function App() {
                     <Route path="/" element={<ExpensesList />} />
                     <Route path="/addExpense" element={<AddExpenseForm />} />
                     <Route path="/updateExpense/:id" element={<UpdateExpenseForm />} />
+                    <Route path="/dashboard" element={<Dashboard />} />
                   </Routes>
                 </UpdateExpenseProvider>
               </div>
             </div>
           </ExpenseProvider>
         </ExpenseTypeProvider>
-      ) : (
+      {/* ) : (
         <Routes>
           <Route path="*" element={<GoogleLogin setIsAuthenticated={setIsAuthenticated} />} />
         </Routes>
-      )}
+      )} */}
     </div>
   );
 }

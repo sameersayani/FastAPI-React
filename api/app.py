@@ -11,7 +11,7 @@ from starlette.requests import Request
 #email
 from typing import List
 from fastapi_mail import ConnectionConfig, FastMail, MessageSchema, MessageType
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel , EmailStr
 #from starlette.responses import JSONResponse
 
 #dotenv
@@ -53,20 +53,21 @@ app.add_middleware(SessionMiddleware, secret_key="db11adfd7f008dcd8347e47fff1734
 # Include the auth router
 app.include_router(google_auth_router, prefix="/api", tags=["Authentication"])
 
-# #adding CORS urls
-# origins = [
-#      "http://127.0.0.1:3000",
-#      "http://127.0.0.1:8000"
-# ]
+#adding CORS urls
+origins = [
+     "http://127.0.0.1:8000",
+     "http://127.0.0.1:3000",
+     "http://127.0.0.1:3000", 
+]
 
-# #add middleware
-# app.add_middleware(
-#     CORSMiddleware,
-#     allow_origins=["http://localhost:3000"],  # React app URL
-#     allow_credentials=True,
-#     allow_methods=["*"],
-#     allow_headers=["*"],
-# )
+#add middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,  # React app URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 templates = Jinja2Templates(directory="templates")
 
@@ -274,6 +275,18 @@ async def custom_swagger_ui():
 @app.get("/oauth2-redirect", include_in_schema=False)
 async def oauth2_redirect():
     return {"message": "Swagger OAuth2 Redirect"}
+
+## charts
+@app.get("/chart-data")
+def get_chart_data():
+    # Example data
+    data = {
+        "labels": ["January", "February", "March", "April"],
+        "barValues": [500, 700, 800, 600],
+        "pieValues": [200, 300, 500],
+        "lineValues": [400, 500, 450, 600],
+    }
+    return data
 
 register_tortoise(
     app,

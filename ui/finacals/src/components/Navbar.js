@@ -50,7 +50,7 @@ const NavBar = () => {
               >
                 Add Expense
               </Link>
-  
+              <Navbar.Brand href="dashboard">Charts</Navbar.Brand>
               Search Bar
               <FormControl
                 type="text"
