@@ -1,4 +1,7 @@
+from collections import defaultdict
+from datetime import datetime
 from fastapi import FastAPI, APIRouter, HTTPException
+from fastapi.responses import JSONResponse
 from tortoise.contrib.fastapi import register_tortoise, HTTPNotFoundError
 from models import (DailyExpenseUpdate, supplier_pydantic, supplier_pydantic_in, Supplier, 
                     product_pydantic, product_pydantic_in, Product,
@@ -58,6 +61,7 @@ origins = [
      "http://127.0.0.1:8000",
      "http://127.0.0.1:3000",
      "http://127.0.0.1:3000", 
+     "http://localhost:3000", 
 ]
 
 #add middleware
@@ -255,7 +259,10 @@ async def update_daily_expense(expense_id: int, expense: DailyExpenseUpdate):
     db_expense.name = expense.name
     db_expense.quantity_purchased = expense.quantity_purchased
     db_expense.unit_price = expense.unit_price
-    db_expense.amount = expense.amount
+    if expense.unit_price > 0 and expense.amount == 0: 
+        db_expense.amount = expense.quantity_purchased * expense.unit_price
+    elif expense.amount > 0 and expense.unit_price == 0:
+        db_expense.amount = expense.amount
     db_expense.really_needed = expense.really_needed
     db_expense.expense_type_id = expense.expense_type_id  # Update the foreign key
 
@@ -278,15 +285,55 @@ async def oauth2_redirect():
 
 ## charts
 @app.get("/chart-data")
-def get_chart_data():
+async def get_chart_data():
+     expenses = DailyExpense.all().prefetch_related('expense_type')
+     response = await DailyExpenseWithExpenseType.from_queryset(expenses)
+     # Group data
+     grouped_data = defaultdict(lambda: defaultdict(list))
+     for expense in response:
+        # Convert object to dictionary
+        expense_dict = expense.dict()
+
+        # Convert date to ISO format string if needed
+        raw_date = expense_dict['date']
+        if isinstance(raw_date, datetime):
+            raw_date = raw_date.isoformat()
+        expense_dict['date'] = raw_date
+
+        # Extract Year/Month and Expense Type
+        date = datetime.fromisoformat(raw_date).date()
+        year_month = date.strftime("%B %Y")  # Format as "Month Year" #f"{date.year}-{date.month:02d}"
+        expense_type = expense_dict['expense_type']['name']
+
+        ## Append expense to grouped structure
+        #grouped_data[year_month][expense_type].append(expense_dict)
+
+        filtered_expense = {
+            "name": expense_dict['name'],
+            "amount": expense_dict['amount'],
+            "really_needed": expense_dict['really_needed'],
+        }
+        grouped_data[year_month][expense_type].append(filtered_expense)
+       
+
+     # Transform defaultdict to regular dict for JSON serialization
+     grouped_dict = {
+          year_month: {
+               expense_type: expenses
+               for expense_type, expenses in types.items()
+          }
+          for year_month, types in grouped_data.items()
+     }
+
+     return JSONResponse(content={"data": grouped_dict}) 
+
     # Example data
-    data = {
-        "labels": ["January", "February", "March", "April"],
-        "barValues": [500, 700, 800, 600],
-        "pieValues": [200, 300, 500],
-        "lineValues": [400, 500, 450, 600],
-    }
-    return data
+#     data = {
+#         "labels": ["January", "February", "March", "April"],
+#         "barValues": [500, 700, 800, 600],
+#         "pieValues": [200, 300, 500],
+#         "lineValues": [400, 500, 450, 600],
+#     }
 
 register_tortoise(
     app,
