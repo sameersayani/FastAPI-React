@@ -1,6 +1,6 @@
 from collections import defaultdict
 from datetime import datetime
-from fastapi import FastAPI, APIRouter, HTTPException
+from fastapi import FastAPI, APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
 from tortoise.contrib.fastapi import register_tortoise, HTTPNotFoundError
 from models import (DailyExpenseUpdate, supplier_pydantic, supplier_pydantic_in, Supplier, 
@@ -27,6 +27,7 @@ credentials = dotenv_values(".env")
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from googleauth import router as google_auth_router
+from typing import Optional
 import os
 
 class EmailSchema(BaseModel):
@@ -218,10 +219,25 @@ async def delete_expensetype(expensetype_id: int):
      return {"status": "OK"} 
 
 @app.get('/dailyexpense')
-async def all_expenses():
-     expenses = DailyExpense.all().prefetch_related('expense_type')
-     response = await DailyExpenseWithExpenseType.from_queryset(expenses)
-     return {"status": "OK", "data": response}
+async def all_expenses(month: Optional[int] = Query(None), year: Optional[int] = Query(None)):
+    # Fetch all expenses
+    expenses = DailyExpense.all().prefetch_related('expense_type')
+    response = await DailyExpenseWithExpenseType.from_queryset(expenses)
+
+    # Convert the response to a list of dictionaries for filtering
+    response_list = [expense.dict() for expense in response]
+
+    if month and year:
+        # Filter expenses based on month and year
+        filtered_expenses = [
+            expense for expense in response_list
+            if isinstance(expense["date"], datetime) and
+               expense["date"].month == month and expense["date"].year == year
+        ]
+        return {"status": "OK", "data": filtered_expenses}
+
+    # Default case: return all expenses
+    return {"status": "OK", "data": response_list}
 
 @app.get('/dailyexpense/{id}')
 async def specific_expense(id: int):
