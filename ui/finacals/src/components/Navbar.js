@@ -54,7 +54,7 @@ const NavBar = () => {
               Search Bar
               <FormControl
                 type="text"
-                placeholder="Search"
+                placeholder="Search by product name"
                 className="me-3"
                 style={{ minWidth: '10px' }}
                 value={search}

@@ -226,7 +226,7 @@ async def all_expenses(month: Optional[int] = Query(None), year: Optional[int] =
 
     # Convert the response to a list of dictionaries for filtering
     response_list = [expense.dict() for expense in response]
-
+    
     if month and year:
         # Filter expenses based on month and year
         filtered_expenses = [
