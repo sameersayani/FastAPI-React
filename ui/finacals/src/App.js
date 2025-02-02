@@ -8,25 +8,51 @@ import ExpensesList from "./components/ExpensesList";
 import { UpdateExpenseProvider } from "./UpdateExpenseContext";
 import UpdateExpenseForm from "./components/UpdateExpense";
 import Dashboard from "./components/Dashboard";
-import Login from "./Login";
-import PrivateRoute from "./components/PrivateRoute";
 
 function App() {
-  const [user, setUser] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const location = useLocation(); // Get the current URL
   const navigate = useNavigate(); // To navigate after login
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    // Check if user is already authenticated (e.g., check token in localStorage)
+    const token = localStorage.getItem("access_token");
     if (token) {
-        fetch("http://127.0.0.1:8000/me", {
-            headers: { Authorization: `Bearer ${token}` },
-        })
-        .then((res) => res.json())
-        .then((data) => setUser(data))
-        .catch(() => localStorage.removeItem("token"));
+      setIsAuthenticated(true);
     }
-}, []);
+  
+    // Check if the app is on the callback URL after the Google login process
+    if (location.pathname === "/auth/callback") {
+      // Extract the authorization code or token from the URL query params
+      const urlParams = new URLSearchParams(location.search);
+      const code = urlParams.get("code");
+
+      if (code) {
+        // Call an API to exchange the code for an access token
+        fetchTokenFromCode(code);
+      }
+    }
+  }, [location]); // Re-run effect when location changes
+
+  const fetchTokenFromCode = async (code) => {
+    try {
+      // Call your backend API to exchange the code for an access token
+      const response = await fetch(`http://127.0.0.1:8000/api/auth/callback?code=${code}`);
+      const data = await response.json();
+      
+      if (data.access_token) {
+        // Save token in localStorage
+        localStorage.setItem("access_token", data.access_token);
+        setIsAuthenticated(true);
+        navigate("/"); // Redirect to the main page or dashboard
+      } else {
+        // Handle error (e.g., token exchange failed)
+        console.error("Failed to authenticate user");
+      }
+    } catch (error) {
+      console.error("Error fetching token:", error);
+    }
+  };
 
   return (
     <div>
@@ -38,17 +64,21 @@ function App() {
               <div className="col-sm-10 col-xm-12 mr-auto ml-auto mt-4 mb-4">
                 <UpdateExpenseProvider>
                   <Routes>
-                    <Route path="/login" element={<Login />} />
-                    <Route path="/" element={<PrivateRoute element={<ExpensesList />} />} />
-                    <Route path="/addExpense" element={<PrivateRoute element={<AddExpenseForm />} />} />
-                    <Route path="/updateExpense/:id" element={<PrivateRoute element={<UpdateExpenseForm />} />} />
-                    <Route path="/dashboard" element={<PrivateRoute element={<Dashboard />} />} />
+                    <Route path="/" element={<ExpensesList />} />
+                    <Route path="/addExpense" element={<AddExpenseForm />} />
+                    <Route path="/updateExpense/:id" element={<UpdateExpenseForm />} />
+                    <Route path="/dashboard" element={<Dashboard />} />
                   </Routes>
                 </UpdateExpenseProvider>
               </div>
             </div>
           </ExpenseProvider>
         </ExpenseTypeProvider>
+      {/* ) : (
+        <Routes>
+          <Route path="*" element={<GoogleLogin setIsAuthenticated={setIsAuthenticated} />} />
+        </Routes>
+      )} */}
     </div>
   );
 }

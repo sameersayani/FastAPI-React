@@ -26,7 +26,6 @@ credentials = dotenv_values(".env")
 #CORS
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
-from googleauth import router as google_auth_router
 from typing import Optional
 import os
 from fastapi import FastAPI, Depends, HTTPException
@@ -58,8 +57,6 @@ SECRET_KEY = os.getenv("SECRET_KEY", "db11adfd7f008dcd8347e47fff1734bd77a59c80a4
 app = FastAPI()
 # Add SessionMiddleware
 app.add_middleware(SessionMiddleware, secret_key="db11adfd7f008dcd8347e47fff1734bd77a59c80a4ad8ff2", https_only=False)
-# Include the auth router
-app.include_router(google_auth_router, prefix="/api", tags=["Authentication"])
 
 #adding CORS urls
 origins = [
@@ -80,38 +77,9 @@ app.add_middleware(
 
 templates = Jinja2Templates(directory="templates")
 
-# oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-# GOOGLE_CLIENT_ID = credentials["GOOGLE_CLIENT_ID"]
-# GOOGLE_CLIENT_SECRET = credentials["GOOGLE_CLIENT_SECRET"]
-# GOOGLE_REDIRECT_URI = credentials["GOOGLE_REDIRECT_URI"]
-
-
 # @app.get('/')
 # def index():
 #     return {"Msg": "for documentation, visit /docs"} 
-
-oauth = OAuth()
-oauth.register(
-    "google",
-    client_id=os.getenv("GOOGLE_CLIENT_ID"),
-    client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
-    authorize_url="https://accounts.google.com/o/oauth2/auth",
-    authorize_params=None,
-    access_token_url="https://oauth2.googleapis.com/token",
-    access_token_params=None,
-    client_kwargs={"scope": "email profile"},
-)
-
-@app.get("/login")
-async def login(request):
-    redirect_uri = os.getenv("GOOGLE_REDIRECT_URI")
-    return await oauth.google.authorize_redirect(request, redirect_uri)
-
-@app.get("/auth")
-async def auth(request):
-    token = await oauth.google.authorize_access_token(request)
-    user = await oauth.google.parse_id_token(request, token)
-    return {"status": "success", "user": user}
 
 @app.get("/")
 def home():
