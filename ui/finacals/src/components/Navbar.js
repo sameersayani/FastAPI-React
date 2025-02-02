@@ -25,7 +25,7 @@ const NavBar = () => {
         <div className="container-fluid">
           {/* Brand */}
           <Navbar.Brand href="/">
-              <FontAwesomeIcon icon={faIndianRupeeSign} style={{ paddingLeft: '10px', fontSize:'2em' }}  />
+              <FontAwesomeIcon icon={faIndianRupeeSign} style={{ paddingLeft: '10px', fontSize:'1em' }}  />
           </Navbar.Brand>
   
           {/* Toggle for Small Screens */}
@@ -33,9 +33,12 @@ const NavBar = () => {
   
           {/* Collapsible Content */}
           <Navbar.Collapse id="navbar-nav">
-            <Nav className="mr-auto align-items-center">
+          <Nav className="mr-auto align-items-center">
+           Daily Expense Manager
+          </Nav>
+            {/* <Nav className="mr-auto align-items-center">
               <Badge className="mt-2" variant="primary">Items purchased {expenses?.data?.length || 0}</Badge>
-            </Nav>
+            </Nav> */}
   
             {/* Right-Side Form */}
             <Form className="d-flex align-items-center" 

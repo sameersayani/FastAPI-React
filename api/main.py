@@ -1,10 +1,12 @@
+from app import app
 import uvicorn
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter,Depends, HTTPException,requests
 from fastapi.templating import Jinja2Templates
 from starlette.requests import Request
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+AUTH_SERVICE_URL = "http://127.0.0.1:8001"  # Change to deployed URL if needed
 # router = APIRouter()
 # app.include_router(router)
 
@@ -25,16 +27,22 @@ app.add_middleware(
 templates = Jinja2Templates(directory="templates")
 
 if __name__ == "__main__":
-    uvicorn.run(
-        app="app:app",
-        host="localhost",
-        port=8000,
-        reload=True
-    )
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+    
+@app.get("/login/google")
+async def login_google():
+    return {"login_url": f"{AUTH_SERVICE_URL}/login/google"}
 
-@app.get("/")
-def index(request: Request):
-    return templates.TemplateResponse(
-        name="home.html",
-        context={"request": request}
-    )
+@app.get("/auth/callback")
+async def auth_callback(code: str):
+    response = requests.get(f"{AUTH_SERVICE_URL}/auth/callback?code={code}")
+    if response.status_code != 200:
+        raise HTTPException(status_code=400, detail="OAuth Failed")
+    return response.json()
+
+@app.get("/me")
+async def get_current_user(token: str):
+    response = requests.get(f"{AUTH_SERVICE_URL}/me", headers={"Authorization": f"Bearer {token}"})
+    if response.status_code != 200:
+        raise HTTPException(status_code=401, detail="Invalid Token")
+    return response.json()

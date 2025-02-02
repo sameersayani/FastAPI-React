@@ -29,6 +29,10 @@ from starlette.middleware.sessions import SessionMiddleware
 from googleauth import router as google_auth_router
 from typing import Optional
 import os
+from fastapi import FastAPI, Depends, HTTPException
+from fastapi.responses import RedirectResponse
+from authlib.integrations.starlette_client import OAuth
+
 
 class EmailSchema(BaseModel):
     email: List[EmailStr]
@@ -85,12 +89,33 @@ templates = Jinja2Templates(directory="templates")
 # @app.get('/')
 # def index():
 #     return {"Msg": "for documentation, visit /docs"} 
+
+oauth = OAuth()
+oauth.register(
+    "google",
+    client_id=os.getenv("GOOGLE_CLIENT_ID"),
+    client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+    authorize_url="https://accounts.google.com/o/oauth2/auth",
+    authorize_params=None,
+    access_token_url="https://oauth2.googleapis.com/token",
+    access_token_params=None,
+    client_kwargs={"scope": "email profile"},
+)
+
+@app.get("/login")
+async def login(request):
+    redirect_uri = os.getenv("GOOGLE_REDIRECT_URI")
+    return await oauth.google.authorize_redirect(request, redirect_uri)
+
+@app.get("/auth")
+async def auth(request):
+    token = await oauth.google.authorize_access_token(request)
+    user = await oauth.google.parse_id_token(request, token)
+    return {"status": "success", "user": user}
+
 @app.get("/")
-def index(request: Request):
-    return templates.TemplateResponse(
-        name="home.html",
-        context={"request": request}
-    )
+def home():
+    return {"message": "FastAPI is running!"}
 
 @app.post('/supplier')
 async def app_supplier(supplier_info: supplier_pydantic_in):
