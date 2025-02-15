@@ -2,6 +2,7 @@ from collections import defaultdict
 from datetime import datetime
 from fastapi import FastAPI, APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from tortoise.contrib.fastapi import register_tortoise, HTTPNotFoundError
 from models import (DailyExpenseUpdate, supplier_pydantic, supplier_pydantic_in, Supplier, 
                     product_pydantic, product_pydantic_in, Product,
@@ -26,12 +27,12 @@ credentials = dotenv_values(".env")
 #CORS
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
+from googleauth import router as google_auth_router
 from typing import Optional
 import os
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.responses import RedirectResponse
-from authlib.integrations.starlette_client import OAuth
-
+from authlib.integrations.starlette_client import OAuth, OAuthError
 
 class EmailSchema(BaseModel):
     email: List[EmailStr]
@@ -55,8 +56,21 @@ conf = ConnectionConfig(
 # Ensure SECRET_KEY is defined in your .env file
 SECRET_KEY = os.getenv("SECRET_KEY", "db11adfd7f008dcd8347e47fff1734bd77a59c80a4ad8ff2")
 app = FastAPI()
+
+# Get the absolute path of the frontend build directory
+frontend_build_path = os.path.abspath("../ui/finacals/src/static")
+
+# Ensure the directory exists before mounting
+if os.path.exists(frontend_build_path):
+    app.mount("/", StaticFiles(directory=frontend_build_path, html=True), name="static")
+else:
+    raise RuntimeError(f"Frontend build directory not found: {frontend_build_path}")
+
 # Add SessionMiddleware
 app.add_middleware(SessionMiddleware, secret_key="db11adfd7f008dcd8347e47fff1734bd77a59c80a4ad8ff2", https_only=False)
+
+# Include the auth router
+app.include_router(google_auth_router, prefix="/api", tags=["Authentication"])
 
 #adding CORS urls
 origins = [
@@ -77,13 +91,76 @@ app.add_middleware(
 
 templates = Jinja2Templates(directory="templates")
 
+# oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+# GOOGLE_CLIENT_ID = credentials["GOOGLE_CLIENT_ID"]
+# GOOGLE_CLIENT_SECRET = credentials["GOOGLE_CLIENT_SECRET"]
+# GOOGLE_REDIRECT_URI = credentials["GOOGLE_REDIRECT_URI"]
+
+
 # @app.get('/')
 # def index():
 #     return {"Msg": "for documentation, visit /docs"} 
 
+oauth = OAuth()
+oauth.register(
+    "google",
+    client_id=os.getenv("GOOGLE_CLIENT_ID"),
+    client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+    authorize_url="https://accounts.google.com/o/oauth2/auth",
+    authorize_params=None,
+    access_token_url="https://oauth2.googleapis.com/token",
+    access_token_params=None,
+    client_kwargs={"scope": "email profile"},
+)
+
 @app.get("/")
-def home():
-    return {"message": "FastAPI is running!"}
+def index(request: Request):
+    user = request.session.get('user')
+    if user:
+        return RedirectResponse('welcome')
+
+    return templates.TemplateResponse(
+        name="home.html",
+        context={"request": request}
+    )
+
+
+@app.get('/welcome')
+def welcome(request: Request):
+    user = request.session.get('user')
+    if not user:
+        return RedirectResponse('/')
+    return templates.TemplateResponse(
+        name='welcome.html',
+        context={'request': request, 'user': user}
+    )
+
+
+@app.get("/login")
+async def login(request: Request):
+    url = request.url_for('auth')
+    return await oauth.google.authorize_redirect(request, url)
+
+
+@app.get('/auth')
+async def auth(request: Request):
+    try:
+        token = await oauth.google.authorize_access_token(request)
+    except OAuthError as e:
+        return templates.TemplateResponse(
+            name='error.html',
+            context={'request': request, 'error': e.error}
+        )
+    user = token.get('userinfo')
+    if user:
+        request.session['user'] = dict(user)
+    return RedirectResponse("http://localhost:3000/")  # Redirect to frontend
+
+@app.get('/logout')
+def logout(request: Request):
+    request.session.pop('user')
+    request.session.clear()
+    return RedirectResponse('/')
 
 @app.post('/supplier')
 async def app_supplier(supplier_info: supplier_pydantic_in):
