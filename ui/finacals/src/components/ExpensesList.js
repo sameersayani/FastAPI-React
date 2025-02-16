@@ -74,6 +74,7 @@ const ExpensesList = () => {
   };
 
   const handleUpdate = (id) => {
+    console.log("Updating expense with ID:", id);
     // Load the selected expense data by ID
     loadExpense(id); // Use loadExpense to populate the context with the data
     navigate(`/updateexpense/${id}`); // Navigate to the Update Expense page
@@ -166,8 +167,6 @@ const ExpensesList = () => {
         Search
       </button>
     </div>
-
-
 </div>
 
       <p className="text-gray-600">

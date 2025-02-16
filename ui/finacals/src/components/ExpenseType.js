@@ -13,8 +13,8 @@ const ExpenseTypeList = ({ onExpenseTypeChange, selectedType }) => {
           throw new Error("Failed to fetch expense types.");
         }
         const data = await response.json();
-        const types = Array.isArray(data.data) ? data.data : [];
-        setExpenseTypes(types);
+        //const types = Array.isArray(data.data) ? data.data : [];
+        setExpenseTypes(data);
       } catch (err) {
         setError(err.message);
       }

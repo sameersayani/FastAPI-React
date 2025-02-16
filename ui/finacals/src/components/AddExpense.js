@@ -32,14 +32,12 @@ const AddExpenseForm = () => {
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData({
-      ...formData,
-      [name]: type === "checkbox" ? checked : value,
-    });
-     // Clear error for the field on change
-     setErrors({ ...errors, [name]: "" });
-  };
 
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : name === "really_needed" ? value === "true" : value,
+    }));
+  };
   const handleRadioChange = (e) => {
     const { value } = e.target;
     setFormData({
@@ -221,7 +219,7 @@ const AddExpenseForm = () => {
             <input
               type="radio"
               name="really_needed"
-              value="false"
+              value={false}
               onChange={handleRadioChange}
               checked={formData.really_needed === false}
               className="form-radio text-red-500"

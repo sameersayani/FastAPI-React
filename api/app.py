@@ -1,238 +1,117 @@
 from collections import defaultdict
 from datetime import datetime
-from fastapi import FastAPI, APIRouter, HTTPException, Query
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, APIRouter, HTTPException, Query, Depends
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from tortoise.contrib.fastapi import register_tortoise, HTTPNotFoundError
-from models import (DailyExpenseUpdate,
-                    expensetpye_pydantic, expensetpye_pydantic_in, ExpenseType,
-                    daily_expense_pydantic, daily_expense_pydantic_in, 
-                    DailyExpense, DailyExpenseWithExpenseType)
+from fastapi.encoders import jsonable_encoder
+from tortoise.contrib.fastapi import register_tortoise
+from models import (
+    DailyExpenseUpdate,
+    expensetpye_pydantic, expensetpye_pydantic_in, ExpenseType,
+    daily_expense_pydantic, daily_expense_pydantic_in,
+    DailyExpense, DailyExpenseWithExpenseType
+)
 from fastapi.security import OAuth2PasswordBearer
-from fastapi.templating import Jinja2Templates
 from starlette.requests import Request
-
-#email
-from typing import List
-from fastapi_mail import ConnectionConfig, FastMail, MessageSchema, MessageType
-from pydantic import BaseModel , EmailStr
-#from starlette.responses import JSONResponse
-
-#dotenv
+from starlette.middleware.sessions import SessionMiddleware
+from fastapi.middleware.cors import CORSMiddleware
 from dotenv import dotenv_values
+from typing import List, Optional
+import os
+from authlib.integrations.starlette_client import OAuth, OAuthError
+from googleauth import router as google_auth_router
 
-#credentials
+# Load environment variables
 credentials = dotenv_values(".env")
 
-#CORS
-from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.sessions import SessionMiddleware
-from googleauth import router as google_auth_router
-from typing import Optional
-import os
-from fastapi import FastAPI, Depends, HTTPException
-from fastapi.responses import RedirectResponse
-from authlib.integrations.starlette_client import OAuth, OAuthError
-
-class EmailSchema(BaseModel):
-    email: List[EmailStr]
-
-class EmailContent(BaseModel):
-     message: str
-     subject: str   
-
-conf = ConnectionConfig(
-    MAIL_USERNAME = credentials["USERNAME"],
-    MAIL_PASSWORD = credentials["PASSWORD"],
-    MAIL_FROM = credentials["EMAIL"],
-    MAIL_PORT = 587,
-    MAIL_SERVER = "smtp.ethereal.email",
-    MAIL_STARTTLS = True,
-    MAIL_SSL_TLS = False,
-    USE_CREDENTIALS = True,
-    VALIDATE_CERTS = True
-)
-
-# Ensure SECRET_KEY is defined in your .env file
-SECRET_KEY = os.getenv("SECRET_KEY", "db11adfd7f008dcd8347e47fff1734bd77a59c80a4ad8ff2")
+# Initialize FastAPI app
 app = FastAPI()
 
-# Get the absolute path of the frontend build directory
-frontend_build_path = os.path.abspath("../ui/finacals/build")
+# Middleware for sessions
+app.add_middleware(SessionMiddleware, secret_key=os.getenv("SECRET_KEY", "default_secret_key"), https_only=False)
 
-# Serve React frontend but keep API working
-if os.path.exists(frontend_build_path):
-    app.mount("/static", StaticFiles(directory=f"{frontend_build_path}/static"), name="static")
-
-    @app.get("/{full_path:path}")  # Catch-all route to serve React index.html
-    async def serve_react_app(full_path: str):
-        return StaticFiles(directory=frontend_build_path, html=True).get_response("index.html", {})
-
-else:
-    print("React build folder not found! Run 'npm run build' inside ui/finacals.")
-
-
-app.add_middleware(SessionMiddleware, secret_key="db11adfd7f008dcd8347e47fff1734bd77a59c80a4ad8ff2", https_only=False)
-
-# Include the auth router
+# Include authentication router
 app.include_router(google_auth_router, prefix="/api", tags=["Authentication"])
 
-#adding CORS urls
-origins = [
-     "http://127.0.0.1:8000",
-     "http://localhost:8000",
-     "http://127.0.0.1:3000", 
-     "http://localhost:3000", 
-]
-
-#add middleware
+# CORS setup
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,  # React app URL
+    allow_origins=["*"],  # Allow all origins
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-templates = Jinja2Templates(directory="templates")
-
-# oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-# GOOGLE_CLIENT_ID = credentials["GOOGLE_CLIENT_ID"]
-# GOOGLE_CLIENT_SECRET = credentials["GOOGLE_CLIENT_SECRET"]
-# GOOGLE_REDIRECT_URI = credentials["GOOGLE_REDIRECT_URI"] 
-
+# OAuth2 Google Authentication
 oauth = OAuth()
 oauth.register(
     "google",
     client_id=os.getenv("GOOGLE_CLIENT_ID"),
     client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
     authorize_url="https://accounts.google.com/o/oauth2/auth",
-    authorize_params=None,
     access_token_url="https://oauth2.googleapis.com/token",
-    access_token_params=None,
     client_kwargs={"scope": "email profile"},
 )
 
-# Your API endpoints below 
+# Health Check
 @app.get("/api/health")
 def health_check():
     return {"status": "API is working!"}
-# Add SessionMiddleware
-@app.get("/test")
-def test():
-    return {"message": "API is working!"}
-    
-@app.get("/")
-def index(request: Request):
-    user = request.session.get('user')
-    if user:
-        return RedirectResponse('welcome')
 
-    return templates.TemplateResponse(
-        name="home.html",
-        context={"request": request}
-    )
-
-
-@app.get('/welcome')
-def welcome(request: Request):
-    user = request.session.get('user')
-    if not user:
-        return RedirectResponse('/')
-    return templates.TemplateResponse(
-        name='welcome.html',
-        context={'request': request, 'user': user}
-    )
-
-
-@app.get("/login")
-async def login(request: Request):
-    url = request.url_for('auth')
-    return await oauth.google.authorize_redirect(request, url)
-
-
-@app.get('/auth')
-async def auth(request: Request):
-    try:
-        token = await oauth.google.authorize_access_token(request)
-    except OAuthError as e:
-        return templates.TemplateResponse(
-            name='error.html',
-            context={'request': request, 'error': e.error}
-        )
-    user = token.get('userinfo')
-    if user:
-        request.session['user'] = dict(user)
-    return RedirectResponse("http://localhost:3000/")  # Redirect to frontend
-
-@app.get('/logout')
-def logout(request: Request):
-    request.session.pop('user')
-    request.session.clear()
-    return RedirectResponse('/')
-
+# Expense Type Endpoints
 @app.get("/expensetype")
 async def get_expensetype():
-     response = await expensetpye_pydantic.from_queryset(ExpenseType.all().order_by("name", "name"))
-     return {"status": "OK", "data" : response}
+    query = ExpenseType.all().order_by("name")  # Don't await here
+    response = await expensetpye_pydantic.from_queryset(query)  # Await here instead
+    return response
 
 @app.get("/expensetype/{expensetype_id}")
 async def get_expensetype_by_id(expensetype_id: int):
-     response = await expensetpye_pydantic.from_queryset_single(ExpenseType.filter(id=expensetype_id).first())
-     return {"status": "OK", "data" : response}
+    response = await ExpenseType.get_or_none(id=expensetype_id)
+    if not response:
+        raise HTTPException(status_code=404, detail="Expense type not found")
+    return JSONResponse(content=jsonable_encoder(await expensetpye_pydantic.from_tortoise_orm(response)))
 
 @app.post('/expensetype')
-async def app_expensetype(expensetype_info: expensetpye_pydantic_in):
-     expensetype_obj = await ExpenseType.create(**expensetype_info.dict(exclude_unset=True))
-     response = await expensetpye_pydantic.from_tortoise_orm(expensetype_obj)
-     return {"status": "OK", "data" : response}
-
-#router = APIRouter() 
-@app.put("/expensetype/{expensetype_id}")
-async def update_expensetype(expensetype_id: int, update_info: expensetpye_pydantic_in):
-     expensetype =  await ExpenseType.get(id=expensetype_id)
-     update_info = update_info.dict(exclude_unset=True)
-     expensetype.name = update_info['name']
-     await expensetype.save()
-     response = await expensetpye_pydantic.from_tortoise_orm(expensetype)
-     return {"status": "OK", "data" : response} 
+async def add_expensetype(expensetype_info: expensetpye_pydantic_in):
+    expensetype_obj = await ExpenseType.create(**expensetype_info.dict(exclude_unset=True))
+    return JSONResponse(content=jsonable_encoder(await expensetpye_pydantic.from_tortoise_orm(expensetype_obj)))
 
 @app.delete("/expensetype/{expensetype_id}")
 async def delete_expensetype(expensetype_id: int):
-     await ExpenseType.filter(id=expensetype_id).delete()
-     return {"status": "OK"} 
+    deleted_count = await ExpenseType.filter(id=expensetype_id).delete()
+    if deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Expense type not found")
+    return {"status": "OK"}
 
+# Daily Expense Endpoints
 @app.get('/dailyexpense')
-async def all_expenses(month: Optional[int] = Query(None), year: Optional[int] = Query(None)):
-    # Fetch all expenses
-    expenses = DailyExpense.all().prefetch_related('expense_type')
-    response = await DailyExpenseWithExpenseType.from_queryset(expenses)
+async def all_expenses(month: Optional[int] = None, year: Optional[int] = None):
+    query = DailyExpense.all().prefetch_related('expense_type')  
+    response = await DailyExpenseWithExpenseType.from_queryset(query)
+    response_list = jsonable_encoder(response)
 
-    # Convert the response to a list of dictionaries for filtering
-    response_list = [dict(expense) for expense in response]
-    
     if month and year:
-        # Filter expenses based on month and year
         filtered_expenses = [
             expense for expense in response_list
-            if isinstance(expense["date"], datetime) and
-               expense["date"].month == month and expense["date"].year == year
+            if expense.get("date") and
+               datetime.fromisoformat(expense["date"].replace("Z", "")).month == month and
+               datetime.fromisoformat(expense["date"].replace("Z", "")).year == year
         ]
-        return {"status": "OK", "data": filtered_expenses}
+        return JSONResponse(content={"status": "OK", "data": filtered_expenses})
 
-    # Default case: return all expenses
-    return {"status": "OK", "data": response_list}
+    return JSONResponse(content={"status": "OK", "data": response_list})
 
 @app.get('/dailyexpense/{id}')
 async def specific_expense(id: int):
-     expense = await DailyExpense.get(id=id).select_related('expense_type')
-     response = await DailyExpenseWithExpenseType.from_tortoise_orm(expense)
-     return {"status": "OK", "data": response}
+    expense = await DailyExpense.get_or_none(id=id).select_related('expense_type')
+    if not expense:
+        raise HTTPException(status_code=404, detail="Expense not found")
 
-@app.delete("/dailyexpense/{dailyexpense_id}")
-async def delete_expense(dailyexpense_id: int):
-     await DailyExpense.filter(id=dailyexpense_id).delete()
-     return {"status": "OK"} 
+    expense_data = await DailyExpenseWithExpenseType.from_tortoise_orm(expense)
+
+    # ✅ Convert Pydantic model to JSON-safe format
+    return JSONResponse(content={"status": "OK", "data": jsonable_encoder(expense_data)})
 
 @app.post('/dailyexpense/{expensetype_id}')
 async def add_expense(expensetype_id: int, expense_details: daily_expense_pydantic_in):
@@ -245,92 +124,33 @@ async def add_expense(expensetype_id: int, expense_details: daily_expense_pydant
     expense_obj = await DailyExpense.create(**expense_details, expense_type = expense_type)
     response = await daily_expense_pydantic.from_tortoise_orm(expense_obj)
     return {"status": "OK", "data": response}
+    
+@app.delete("/dailyexpense/{dailyexpense_id}")
+async def delete_expense(dailyexpense_id: int):
+    deleted_count = await DailyExpense.filter(id=dailyexpense_id).delete()
+    if deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Expense not found")
+    return {"status": "OK", "message": "Expense deleted", "data": None}
 
 @app.put("/dailyexpense/{expense_id}")
 async def update_daily_expense(expense_id: int, expense: DailyExpenseUpdate):
     db_expense = await DailyExpense.get_or_none(id=expense_id)
-    if not expense:
+    if not db_expense:
         raise HTTPException(status_code=404, detail="Expense not found")
 
-#     formatted_date = expense.date.strftime("%Y-%m-%d")
-    # Update fields, including expense_type_id
-    print(f"Expense: {expense}")
-    db_expense.date = expense.date
-    db_expense.name = expense.name
-    db_expense.quantity_purchased = expense.quantity_purchased
-    db_expense.unit_price = expense.unit_price
-    if expense.unit_price > 0 and expense.amount == 0: 
-        db_expense.amount = expense.quantity_purchased * expense.unit_price
-    elif expense.amount > 0 and expense.unit_price == 0:
-        db_expense.amount = expense.amount
-    db_expense.really_needed = expense.really_needed
-    db_expense.expense_type_id = expense.expense_type_id  # Update the foreign key
+    for key, value in expense.dict(exclude_unset=True).items():
+        setattr(db_expense, key, value)
 
     await db_expense.save()
-    return db_expense
+    updated_expense = await daily_expense_pydantic.from_tortoise_orm(db_expense)
 
-# Override Swagger UI to include OAuth2 settings
-@app.get("/docs", include_in_schema=False)
-async def custom_swagger_ui():
-    return get_swagger_ui_html(
-        openapi_url=app.openapi_url,
-        title="Custom Swagger with Google OAuth2",
-        oauth2_redirect_url="http://127.0.0.1:8000/api/auth/callback",
-    )
+    return JSONResponse(content={"status": "OK", "data": jsonable_encoder(updated_expense)})
 
-# Include the OpenAPI redirect route for Swagger OAuth2
-@app.get("/oauth2-redirect", include_in_schema=False)
-async def oauth2_redirect():
-    return await {"message": "Swagger OAuth2 Redirect"}
-
-## charts
-@app.get("/chart-data")
-async def get_chart_data():
-     expenses = DailyExpense.all().prefetch_related('expense_type')
-     response = await DailyExpenseWithExpenseType.from_queryset(expenses)
-     # Group data
-     grouped_data = defaultdict(lambda: defaultdict(list))
-     for expense in response:
-        # Convert object to dictionary
-        expense_dict = dict(expense)
-
-        # Convert date to ISO format string if needed
-        raw_date = expense_dict['date']
-        if isinstance(raw_date, datetime):
-            raw_date = raw_date.isoformat()
-        expense_dict['date'] = raw_date
-
-        # Extract Year/Month and Expense Type
-        date = datetime.fromisoformat(raw_date).date()
-        year_month = date.strftime("%B %Y")  # Format as "Month Year" #f"{date.year}-{date.month:02d}"
-        expense_type = expense_dict['expense_type']['name']
-
-        ## Append expense to grouped structure
-        #grouped_data[year_month][expense_type].append(expense_dict)
-
-        filtered_expense = {
-            "name": expense_dict['name'],
-            "amount": expense_dict['amount'],
-            "really_needed": expense_dict['really_needed'],
-        }
-        grouped_data[year_month][expense_type].append(filtered_expense)
-       
-
-     # Transform defaultdict to regular dict for JSON serialization
-     grouped_dict = {
-          year_month: {
-               expense_type: expenses
-               for expense_type, expenses in types.items()
-          }
-          for year_month, types in grouped_data.items()
-     }
-
-     return JSONResponse(content={"data": grouped_dict}) 
-
+# Database Registration
 register_tortoise(
     app,
     db_url="sqlite://database.sqlite3",
-    modules={"models" : ["models"]},
+    modules={"models": ["models"]},
     generate_schemas=True,
     add_exception_handlers=True
 )

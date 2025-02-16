@@ -31,20 +31,21 @@ const UpdateExpenseForm = ({ id, onCancel }) => {
 
   useEffect(() => {
     console.log('Expense data received:', expenseData);
-    if (expenseData) {
+  
+    if (expenseData && expenseData.data) {
       const { date, name, quantity_purchased, unit_price, amount, really_needed, expense_type } = expenseData.data;
+  
       setFormData({
-        date: date ? date.split("T")[0] : "" || "",
+        date: date ? date.split("T")[0] : "", 
         name: name || "",
         quantity_purchased: quantity_purchased || 1,
         unit_price: unit_price || 0,
         amount: amount || 0,
         really_needed: really_needed || false,
-        expense_type: expense_type?.id || null,
-        //expenseId: expenseData.id
+        expense_type: expense_type.id || null,
       });
     }
-  }, [expenseData]);
+  }, [expenseData]);  
 
     // Don't render the form until expenseData is available
     if (loading) {
@@ -53,13 +54,13 @@ const UpdateExpenseForm = ({ id, onCancel }) => {
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
+
     setFormData((prev) => ({
       ...prev,
-      [name]: type === "checkbox" ? checked : value,
+      [name]: type === "checkbox" ? checked : name === "really_needed" ? value === "true" : value,
     }));
-    setErrors((prev) => ({ ...prev, [name]: "" }));
   };
-
+        
   const handleExpenseTypeChange = (typeId) => {
     setFormData((prev) => ({ ...prev, expense_type: typeId }));
     setSelectedExpenseTypeId(typeId);
@@ -119,6 +120,8 @@ const UpdateExpenseForm = ({ id, onCancel }) => {
         really_needed: formData.really_needed,
         expense_type_id: selectedExpenseTypeId || formData.expense_type, // Ensure this is properly set
       };
+      console.log("expenseData.data?.id:", expenseData.data?.id);
+      console.log("updatedData", updatedData);
       await updateExpense(expenseData.data?.id, updatedData);
       setSuccessMessage("Expense updated successfully!");
       
