@@ -1,9 +1,10 @@
 from collections import defaultdict
 from datetime import datetime
-from fastapi import FastAPI, APIRouter, HTTPException, Query, Depends
+from fastapi import FastAPI, APIRouter, HTTPException, Query, Depends, requests
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.encoders import jsonable_encoder
+from fastapi.templating import Jinja2Templates
 from tortoise.contrib.fastapi import register_tortoise
 from models import (
     DailyExpenseUpdate,
@@ -11,47 +12,101 @@ from models import (
     daily_expense_pydantic, daily_expense_pydantic_in,
     DailyExpense, DailyExpenseWithExpenseType
 )
-from fastapi.security import OAuth2PasswordBearer
 from starlette.requests import Request
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import dotenv_values
 from typing import List, Optional
-import os
+from starlette.middleware.sessions import SessionMiddleware
 from authlib.integrations.starlette_client import OAuth, OAuthError
-from googleauth import router as google_auth_router
-
-# Load environment variables
-credentials = dotenv_values(".env")
+from api.config import CLIENT_ID, CLIENT_SECRET
+from fastapi.staticfiles import StaticFiles
+import os
 
 # Initialize FastAPI app
 app = FastAPI()
 
 # Middleware for sessions
 app.add_middleware(SessionMiddleware, secret_key=os.getenv("SECRET_KEY", "default_secret_key"), https_only=False)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Include authentication router
-app.include_router(google_auth_router, prefix="/api", tags=["Authentication"])
+oauth = OAuth()
+oauth.register(
+    name='google',
+    server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
+    client_id=CLIENT_ID,
+    client_secret=CLIENT_SECRET,
+    client_kwargs={
+        'scope': 'email openid profile',
+        # 'redirect_url': 'http://localhost:8000/auth'
+    }
+)
 
-# CORS setup
+# # CORS setup
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins
+    allow_origins=["http://127.0.0.1:3000"],  # Allow all origins
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# OAuth2 Google Authentication
-oauth = OAuth()
-oauth.register(
-    "google",
-    client_id=os.getenv("GOOGLE_CLIENT_ID"),
-    client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
-    authorize_url="https://accounts.google.com/o/oauth2/auth",
-    access_token_url="https://oauth2.googleapis.com/token",
-    client_kwargs={"scope": "email profile"},
-)
+templates = Jinja2Templates(directory="templates")
+
+@app.get("/")
+def index(request: Request):
+    user = request.session.get('user')
+    if user:
+        return RedirectResponse('welcome')
+
+    return templates.TemplateResponse(
+        name="home.html",
+        context={"request": request}
+    )
+
+@app.get('/welcome')
+def welcome(request: Request):
+    user = request.session.get('user')
+    if not user:
+        return RedirectResponse('/')
+    return templates.TemplateResponse(
+        name='welcome.html',
+        context={'request': request, 'user': user}
+    )
+
+@app.get("/login")
+async def login(request: Request):
+    url = request.url_for('auth')
+    return await oauth.google.authorize_redirect(request, url)
+
+@app.get('/auth')
+async def auth(request: Request):
+    try:
+        token = await oauth.google.authorize_access_token(request)
+    except OAuthError as e:
+        return templates.TemplateResponse(
+            name='error.html',
+            context={'request': request, 'error': e.error}
+        )
+    
+    user = token.get('userinfo')
+    if user:
+        request.session['user'] = dict(user)
+
+    return RedirectResponse("http://127.0.0.1:3000/")
+
+@app.get("/user")
+def get_user(request: Request):
+    user = request.session.get("user")
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return JSONResponse(content={"user": user})
+
+@app.get('/logout')
+def logout(request: Request):
+    request.session.pop('user')
+    request.session.clear()
+    return RedirectResponse('/')
 
 # Health Check
 @app.get("/api/health")
@@ -145,6 +200,67 @@ async def update_daily_expense(expense_id: int, expense: DailyExpenseUpdate):
     updated_expense = await daily_expense_pydantic.from_tortoise_orm(db_expense)
 
     return JSONResponse(content={"status": "OK", "data": jsonable_encoder(updated_expense)})
+
+## charts
+@app.get("/chart-data")
+async def get_chart_data(month: Optional[int] = None, year: Optional[int] = None):
+    query = DailyExpense.all().prefetch_related('expense_type')  
+    response = await DailyExpenseWithExpenseType.from_queryset(query)
+    response_list = jsonable_encoder(response)
+
+    if month and year:
+        filtered_expenses = [
+            expense for expense in response_list
+            if expense.get("date") and
+               datetime.fromisoformat(expense["date"].replace("Z", "")).month == month and
+               datetime.fromisoformat(expense["date"].replace("Z", "")).year == year
+        ]
+     # Group data
+    grouped_data = defaultdict(lambda: defaultdict(list))
+    for expense in filtered_expenses:
+        # Convert object to dictionary
+        expense_dict = dict(expense)
+
+        # Convert date to ISO format string if needed
+        raw_date = expense_dict['date']
+        if isinstance(raw_date, datetime):
+            raw_date = raw_date.isoformat()
+        expense_dict['date'] = raw_date
+
+        # Extract Year/Month and Expense Type
+        date = datetime.fromisoformat(raw_date).date()
+        year_month = date.strftime("%B %Y")  # Format as "Month Year" #f"{date.year}-{date.month:02d}"
+        expense_type = expense_dict['expense_type']['name']
+
+        ## Append expense to grouped structure
+        #grouped_data[year_month][expense_type].append(expense_dict)
+
+        filtered_expense = {
+            "name": expense_dict['name'],
+            "amount": expense_dict['amount'],
+            "really_needed": expense_dict['really_needed'],
+        }
+        grouped_data[year_month][expense_type].append(filtered_expense)
+       
+
+     # Transform defaultdict to regular dict for JSON serialization
+    grouped_dict = {
+          year_month: {
+               expense_type: expenses
+               for expense_type, expenses in types.items()
+          }
+          for year_month, types in grouped_data.items()
+     }
+
+    return JSONResponse(content={"data": grouped_dict}) 
+
+    # Example data
+#     data = {
+#         "labels": ["January", "February", "March", "April"],
+#         "barValues": [500, 700, 800, 600],
+#         "pieValues": [200, 300, 500],
+#         "lineValues": [400, 500, 450, 600],
+#     }
 
 # Database Registration
 register_tortoise(

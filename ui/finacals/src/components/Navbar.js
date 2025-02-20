@@ -1,4 +1,4 @@
-import {react, useContext, useState} from "react";
+import {react, useContext, useState, useEffect} from "react";
 import {Navbar, Nav, Form, FormControl, Button, Badge} from 'react-bootstrap';
 import {Link} from  "react-router-dom";
 import { ExpenseContext } from "../ExpenseContext";
@@ -8,7 +8,8 @@ import { faIndianRupeeSign } from '@fortawesome/free-solid-svg-icons';
 const NavBar = () => {
     const [search, setSearch] = useState("");
     const [expenses, setExpenses] = useContext(ExpenseContext);
-    
+    const [user, setUser] = useState(null);
+
     const updateSearch = (e) => {
         setSearch(e.target.value);
     }
@@ -20,12 +21,41 @@ const NavBar = () => {
       setExpenses({"data" : [...expense]})
   }
 
+  const fetchUser = async () => {
+    try {
+        const response = await fetch("http://127.0.0.1:8000/user", {
+            credentials: "include", // Important to send session cookies
+        });
+
+        if (!response.ok) throw new Error("Not authenticated");
+
+        const data = await response.json();
+        setUser(data.user);
+    } catch (error) {
+        setUser(null); // If not authenticated, reset user state
+      }
+  };
+
+  useEffect(() => {
+      fetchUser();
+  }, []);
+
+  // Logout function
+  const handleLogout = () => {
+      window.location.href = "http://127.0.0.1:8000/logout"; // Redirects to FastAPI logout
+  };
+
     return(
         <Navbar bg="dark" expand="lg" variant="dark">
         <div className="container-fluid">
           {/* Brand */}
-          <Navbar.Brand href="/">
-              <FontAwesomeIcon icon={faIndianRupeeSign} style={{ paddingLeft: '10px', fontSize:'2em' }}  />
+          <Navbar.Brand href="/"> 
+          <img
+            src="/logo.png"  // Make sure the logo is inside the "public" folder
+            alt="Logo"
+            width="150"
+            height="100"
+          />{" "}
           </Navbar.Brand>
   
           {/* Toggle for Small Screens */}
@@ -33,10 +63,7 @@ const NavBar = () => {
   
           {/* Collapsible Content */}
           <Navbar.Collapse id="navbar-nav">
-            <Nav className="mr-auto align-items-center">
-              <Badge className="mt-2" variant="primary">Items purchased {expenses?.data?.length || 0}</Badge>
-            </Nav>
-  
+            
             {/* Right-Side Form */}
             <Form className="d-flex align-items-center" 
             style={{ width: '70%' }}
@@ -45,16 +72,24 @@ const NavBar = () => {
               Add New Expense
               <Link
                 to="/addexpense"
-                className="btn btn-primary btn-sm me-3"
+                className="rounded-md bg-blue-600 py-2 px-4 border border-transparent text-center text-sm text-white transition-all shadow-md hover:shadow-lg focus:bg-blue-700 focus:shadow-none active:bg-blue-700 hover:bg-blue-700 active:shadow-none disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none ml-2"
                 style={{ whiteSpace: 'nowrap' }}
               >
                 Add Expense
               </Link>
-              <Navbar.Brand href="dashboard">Charts</Navbar.Brand>
+              <Navbar.Brand>
+                <Link
+                to="dashboard"
+                className="rounded-md bg-green-600 py-2 px-4 border border-transparent text-center text-sm text-white transition-all shadow-md hover:shadow-lg focus:bg-green-700 focus:shadow-none active:bg-green-700 hover:bg-green-700 active:shadow-none disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none ml-2"
+                style={{ whiteSpace: 'nowrap' }}
+                >
+                Show Charts
+                </Link>
+                </Navbar.Brand>
               Search Bar
               <FormControl
                 type="text"
-                placeholder="Search"
+                placeholder="Search by product name"
                 className="me-3"
                 style={{ minWidth: '10px' }}
                 value={search}
@@ -71,6 +106,56 @@ const NavBar = () => {
             </Form>
           </Navbar.Collapse>
         </div>
+        <div className="d-flex align-items-center">
+                {user ? (
+                    <div className="d-flex align-items-center">
+                        {/* Welcome Message */}
+                        <span style={{
+                            color: "white",
+                            fontWeight: "bold",
+                            marginRight: "25px",
+                            fontSize: "16px",
+                            whiteSpace: 'nowrap'
+                        }}>
+                            Welcome, {user.given_name} {user.family_name} !
+                        </span>
+
+                        {/* Logout Button */}
+                        <a 
+                            href="http://127.0.0.1:8000/logout" 
+                            style={{
+                                color: "orange",
+                                fontSize: "14px",
+                                fontWeight: "bold",
+                                textDecoration: "none",
+                                cursor: "pointer",
+                                marginRight: "25px",
+                                transition: "color 0.3s"
+                            }}
+                            onMouseOver={(e) => e.target.style.color = "#ff9800"}
+                            onMouseOut={(e) => e.target.style.color = "orange"}
+                        >
+                            Logout
+                        </a>
+                    </div>
+                ) : (
+                    <a 
+                        href="http://127.0.0.1:8000/login"
+                        style={{
+                            color: "green",
+                            fontSize: "14px",
+                            fontWeight: "bold",
+                            textDecoration: "none",
+                            cursor: "pointer",
+                            transition: "color 0.3s"
+                        }}
+                        onMouseOver={(e) => e.target.style.color = "#4CAF50"}
+                        onMouseOut={(e) => e.target.style.color = "green"}
+                    >
+                        Login with Google
+                    </a>
+                )}
+            </div>
       </Navbar>
     );
 }

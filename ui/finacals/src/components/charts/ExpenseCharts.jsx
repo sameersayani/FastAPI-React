@@ -7,6 +7,12 @@ import {generateRandomColor} from './ColorHelper';
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, LineElement, PointElement);
 
 const ExpenseCharts = () => {
+  const currentDate = new Date();
+  const currentMonth = currentDate.getMonth() + 1; // Months are 0-indexed
+  const currentYear = currentDate.getFullYear();
+  const [filters, setFilters] = useState({ month: currentMonth, year: currentYear });
+  const [loading, setLoading] = useState(false);
+
   const [chartType, setChartType] = useState('pie');
   const [chartData, setChartData] = useState({
     barData: {
@@ -44,10 +50,24 @@ const ExpenseCharts = () => {
     setChartType(event.target.value);
   };
 
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters(prev => ({ ...prev, [name]: Number(value) }));
+  };
   useEffect(() => {
+    setLoading(true); 
     // Fetch data from API
-    fetch('http://localhost:8000/chart-data')  // Replace with your actual endpoint
-      .then(response => response.json())
+    const queryParams = new URLSearchParams({
+      month: filters.month,
+      year: filters.year,
+      _t: Date.now(), // Prevent browser caching
+    });
+
+    // if (filters.month) queryParams.append("month", filters.month);
+    // if (filters.year) queryParams.append("year", filters.year);
+
+    fetch(`http://127.0.0.1:8000/chart-data?${queryParams.toString()}`)
+      .then((response) => response.json())
       .then(data => {
         const expenseData = data.data;  // Extract the data field from the API response
         const categories = Object.keys(expenseData);
@@ -125,7 +145,7 @@ const ExpenseCharts = () => {
         });
       })
       .catch(error => console.error('Error fetching data:', error));
-  }, []);
+    }, [filters]);
 
   // Add a check to render charts only when the data is available
   if (!chartData.barData || !chartData.pieData || !chartData.lineData) {
@@ -135,11 +155,31 @@ const ExpenseCharts = () => {
   return (
     <div>
       <h1>Expense Charts</h1>
-      <select onChange={handleChartTypeChange} value={chartType}>
-        <option value="pie">Pie Chart</option>
-        <option value="bar">Bar Chart</option>
-        <option value="line">Line Chart</option>
-      </select>
+        {/* Month & Year Dropdowns */}
+        <div style={{ display: "flex", gap: "10px", marginBottom: "15px" }}>
+        {/* Month Dropdown */}
+        <select name="month" value={filters.month} onChange={handleFilterChange}>
+          {[...Array(12)].map((_, i) => (
+            <option key={i + 1} value={i + 1}>
+              {new Date(2021, i, 1).toLocaleString('default', { month: 'long' })}
+            </option>
+          ))}
+        </select>
+
+        {/* Year Dropdown */}
+        <select name="year" value={filters.year} onChange={handleFilterChange}>
+          {[currentYear - 2, currentYear - 1, currentYear, currentYear + 1].map(year => (
+            <option key={year} value={year}>{year}</option>
+          ))}
+        </select>
+
+        {/* Chart Type Dropdown */}
+        <select onChange={handleChartTypeChange} value={chartType}>
+          <option value="pie">Pie Chart</option>
+          <option value="bar">Bar Chart</option>
+          <option value="line">Line Chart</option>
+        </select>
+      </div>
 
       {chartType === 'pie' && 
       <div className="chart-container">
