@@ -3,6 +3,8 @@ import { Bar, Pie, Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, LineElement, PointElement } from 'chart.js';
 import '../charts/charts.css';
 import {generateRandomColor} from './ColorHelper';
+import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, LineElement, PointElement);
 
@@ -12,6 +14,7 @@ const ExpenseCharts = () => {
   const currentYear = currentDate.getFullYear();
   const [filters, setFilters] = useState({ month: currentMonth, year: currentYear });
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   const [chartType, setChartType] = useState('pie');
   const [chartData, setChartData] = useState({
@@ -154,6 +157,12 @@ const ExpenseCharts = () => {
 
   return (
     <div>
+      <Link
+        to="/"
+        className="bg-blue-400 text-white px-6 py-2 rounded-md hover:bg-gray-500 inline"
+      >
+        Home
+      </Link>
       <h1>Expense Charts</h1>
         {/* Month & Year Dropdowns */}
         <div style={{ display: "flex", gap: "10px", marginBottom: "15px" }}>
@@ -179,6 +188,7 @@ const ExpenseCharts = () => {
           <option value="bar">Bar Chart</option>
           <option value="line">Line Chart</option>
         </select>
+        <span class="mx-4 space-y-4">&nbsp;</span>
       </div>
 
       {chartType === 'pie' && 

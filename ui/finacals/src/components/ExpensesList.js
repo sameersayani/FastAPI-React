@@ -26,6 +26,7 @@ const ExpensesList = () => {
   const essentialExpenditure = totals?.essential_expenditure || "0";
 
   const [isDownloadModalOpen, setDownloadModalOpen] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   let navigate = useNavigate();
 
@@ -44,6 +45,10 @@ const ExpensesList = () => {
   useEffect(() => {
     setSearchError(""); // Clear error when ExpensesList loads
   }, []); // Runs only on mount
+
+  useEffect(() => {
+    handleSearch(); // Fetch latest expenses whenever refreshTrigger updates
+  }, [refreshTrigger]); 
   
   const handleSearch = async () => {
     try {
@@ -90,6 +95,7 @@ const ExpensesList = () => {
 
           setSearchError("")
           setNavbarSearch("")
+          setRefreshTrigger((prev) => prev + 1);
         } else {
           alert("Failed to delete the expense !");
         }
@@ -101,7 +107,7 @@ const ExpensesList = () => {
   };
 
   const handleUpdate = (id) => {
-    console.log("Updating expense with ID:", id);
+    //console.log("Updating expense with ID:", id);
     // Load the selected expense data by ID
     loadExpense(id); // Use loadExpense to populate the context with the data
     navigate(`/updateexpense/${id}`); // Navigate to the Update Expense page
@@ -122,6 +128,7 @@ const ExpensesList = () => {
           non_essential_expenditure: result.non_essential_expenditure || 0,
           essential_expenditure: result.essential_expenditure || 0,
         });
+        setRefreshTrigger((prev) => prev + 1);
       })
       .catch((error) => console.error("Error fetching expenses:", error));
   };

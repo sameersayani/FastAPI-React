@@ -19,30 +19,30 @@ const AddExpenseForm = () => {
   const [error, setError] = useState("");
   const [errors, setErrors] = useState({});
   const [successMessage, setSuccessMessage] = useState("");
-  
+
   const handleExpenseTypeChange = (typeId) => {
-    setFormData((prev) => ({ ...prev, expense_type: typeId })); // Update expense_type in formData
-    setErrors((prev) => ({ ...prev, expense_type: "" })); // Clear error
+    setFormData((prev) => ({ ...prev, expense_type: typeId }));
+    setErrors((prev) => ({ ...prev, expense_type: "" }));
   };
 
   const handleDateChange = (selectedDate) => {
     setFormData({ ...formData, date: selectedDate });
-    setErrors({ ...errors, date: "" }); // Clear error when date is selected
+    setErrors({ ...errors, date: "" });
   };
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-
     setFormData((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : name === "really_needed" ? value === "true" : value,
     }));
   };
+
   const handleRadioChange = (e) => {
     const { value } = e.target;
     setFormData({
       ...formData,
-      really_needed: value === "true", 
+      really_needed: value === "true",
     });
     setErrors({ ...errors, really_needed: "" });
   };
@@ -53,18 +53,27 @@ const AddExpenseForm = () => {
 
   const validateForm = () => {
     const newErrors = {};
+    const unitPrice = String(formData.unit_price).trim() === "" ? 0 : parseFloat(formData.unit_price);
+    const amount = String(formData.amount).trim() === "" ? 0 : parseFloat(formData.amount);
 
-    if(!formData.expense_type) newErrors.expense_type = "Select from expense category";
-    if (!formData.date) newErrors.date = "Date is required.";
-    if (!formData.name) newErrors.name = "Name of product or service purchased is required.";
-    if (formData.unit_price <= 0 && formData.amount <= 0) {
-      newErrors.unit_price = "Either unit price or amount must be greater than 0.";
-      newErrors.amount = "Either unit price or amount must be greater than 0.";
+    if (!formData.expense_type) newErrors.expense_type = "Select an expense category";
+    if (!formData.date) newErrors.date = "Date is required";
+    if (!formData.name) newErrors.name = "Product/service name is required";
+    if (unitPrice > 0 && amount > 0) {
+      newErrors.unit_price = "Please either enter unit price or amount. If you enter unit price, amount will auto-calculate";
+    }
+    if (unitPrice <= 0 && amount <= 0) {
+      newErrors.amount = "Either unit price or amount must be greater than 0";
     }
     if (formData.quantity_purchased <= 0) {
-      newErrors.quantity_purchased = "Quantity must be greater than 0.";
+      newErrors.quantity_purchased = "Quantity must be greater than 0";
     }
-
+    if(formData.unit_price === ""){
+      formData.unit_price = 0;
+    }
+    if(formData.amount === ""){
+      formData.amount = 0;
+    }
     return newErrors;
   };
 
@@ -77,7 +86,6 @@ const AddExpenseForm = () => {
     }
 
     setErrors({});
-
     setError(null);
     setSuccessMessage("");
     setLoading(true);
@@ -93,18 +101,18 @@ const AddExpenseForm = () => {
       });
 
       if (!response.ok) {
-        console.log(JSON.stringify(payload))
         throw new Error("Failed to add expense.");
       }
 
       setSuccessMessage("Expense added successfully!");
       setFormData({
-        date: "",
+        date: new Date().toISOString().split("T")[0],
         name: "",
         quantity_purchased: 1,
         unit_price: 0,
         amount: 0,
         really_needed: false,
+        expense_type: null,
       });
       navigate("/");
     } catch (err) {
@@ -115,135 +123,47 @@ const AddExpenseForm = () => {
   };
 
   return (
-    <div className="p-4">
-      <h2 className="text-lg font-semibold mb-4">Add New Expense</h2>
+    <div className="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-md space-y-6">
+      <h2 className="text-2xl font-bold text-gray-800 mb-4">Add New Expense</h2>
 
-      {error && <p className="text-red-500 mb-2">{error}</p>}
-      {successMessage && <p className="text-green-500 mb-2">{successMessage}</p>}
+      {typeof error === "string" && <p className="text-red-500 text-sm mb-2">{error}</p>}
+      {Object.values(errors).map((err, index) => (
+        <p key={index} className="text-red-500 text-sm mb-2"><strong>{err}</strong></p>
+      ))}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Expense Type Radio List */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Select Expense Type
-          </label>
-          <ExpenseTypeist onExpenseTypeChange={handleExpenseTypeChange} selectedType={formData.expense_type} />
-          {errors.expense_type && (
-          <p className="text-red-500 text-sm">{errors.expense_type}</p>
-        )}
-        </div>
-        <DatePicker
-        selectedDate={formData.date}
-        onChange={handleDateChange}
-        className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${
-          errors.date ? "border-red-500" : ""
-        }`} />
-         {errors.date && <p className="text-red-500 text-sm">{errors.date}</p>}
-        <div>
-          <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-            Product / Service Name
-          </label>
-          <input
-            type="text"
-            id="name"
-            name="name"
-            value={formData.name}
-            onChange={handleInputChange}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-          />
-          {errors.name && <p className="text-red-500 text-sm">{errors.name}</p>}
-        </div>
+      {successMessage && <p className="text-green-500 text-sm mb-2">{successMessage}</p>}
 
-        <div>
-          <label htmlFor="quantity_purchased" className="block text-sm font-medium text-gray-700">
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <ExpenseTypeist onExpenseTypeChange={handleExpenseTypeChange} selectedType={formData.expense_type} />
+        <DatePicker selectedDate={formData.date} onChange={handleDateChange} />
+        <input type="text" name="name" placeholder="Product / Service Purchased" value={formData.name} onChange={handleInputChange} className="w-full p-3 border rounded-md" />
+        <label htmlFor="quantity_purchased" className="block text-sm font-medium text-gray-700">
             Quantity Purchased
           </label>
-          <input
-            type="number"
-            id="quantity_purchased"
-            name="quantity_purchased"
-            value={formData.quantity_purchased}
-            onChange={handleInputChange}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-          />
-        </div>
-
-        <div>
-          <label htmlFor="unit_price" className="block text-sm font-medium text-gray-700">
+        <input type="number" name="quantity_purchased" placeholder="Quantity" value={formData.quantity_purchased} onChange={handleInputChange} className="w-full p-3 border rounded-md" />
+        <label htmlFor="unit_price" className="block text-sm font-medium text-gray-700">
             Unit Price
           </label>
-          <input
-            type="number"
-            id="unit_price"
-            name="unit_price"
-            value={formData.unit_price}
-            onChange={handleInputChange}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-          />
-          {errors.unit_price && (
-          <p className="text-red-500 text-sm">{errors.unit_price}</p>
-        )}
-        </div>
-
-        <div>
-          <label htmlFor="amount" className="block text-sm font-medium text-gray-700">
+        <input type="number" name="unit_price" placeholder="Unit Price" value={formData.unit_price} onChange={handleInputChange} className="w-full p-3 border rounded-md" />
+        <label htmlFor="amount" className="block text-sm font-medium text-gray-700">
             Amount
           </label>
-          <input
-            type="number"
-            id="amount"
-            name="amount"
-            value={formData.amount}
-            onChange={handleInputChange}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-          />
-        </div>
-
-        <div className="flex items-center space-x-4">
-        <div>
-          <label className="text-sm font-medium text-gray-700">Really need?</label>
-        </div>
-        <div className="flex items-center space-x-4">
-          <label className="flex items-center space-x-2">
-            <input
-              type="radio"
-              name="really_needed"
-              value="true"
-              onChange={handleRadioChange}
-              checked={formData.really_needed === true}
-              className="form-radio text-blue-500"
-            />
-            <span className="text-sm">Yes</span>
-          </label>
-          <label className="flex items-center space-x-2">
-            <input
-              type="radio"
-              name="really_needed"
-              value={false}
-              onChange={handleRadioChange}
-              checked={formData.really_needed === false}
-              className="form-radio text-red-500"
-            />
-            <span className="text-sm">No</span>
-          </label>
-        </div>
-        </div>
-        <div className="flex space-x-4">
+        <input type="number" name="amount" placeholder="Amount" value={formData.amount} onChange={handleInputChange} className="w-full p-3 border rounded-md" />
+        <button type="submit" className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700">{loading ? "Saving..." : "Add Expense"}</button>
+        <span class="mx-4 space-y-4">&nbsp;</span>
         <button
-          type="submit"
-          className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
-          disabled={loading}
-        >
-          {loading ? "Saving..." : "Add Expense"}
+          type="button"
+          onClick={() => navigate("/")}
+          className="bg-gray-400 text-white px-6 py-2 rounded-md hover:bg-gray-500"
+        > 
+          Cancel
         </button>
-        <button
-            type="button"
-            onClick={handleCancel}
-            className="bg-gray-300 text-black px-4 py-2 rounded-md"
-          >
-            Cancel
-          </button>
-          </div>
+
+          {typeof error === "string" && <p className="text-red-500 text-sm mb-2">{error}</p>}
+          {Object.values(errors).map((err, index) => (
+            <p key={index} className="text-red-500 text-sm mb-2"><strong>{err}</strong></p>
+          ))}
+          {successMessage && <p className="text-green-500 text-sm mb-2">{successMessage}</p>}
       </form>
     </div>
   );
