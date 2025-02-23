@@ -1,6 +1,8 @@
 from collections import defaultdict
 from datetime import datetime
-from fastapi import FastAPI, APIRouter, HTTPException, Query, Depends, requests
+import io
+import json
+from fastapi import FastAPI, APIRouter, HTTPException, Query, Depends, Response, requests
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.encoders import jsonable_encoder
@@ -22,6 +24,8 @@ from authlib.integrations.starlette_client import OAuth, OAuthError
 from api.config import CLIENT_ID, CLIENT_SECRET
 from fastapi.staticfiles import StaticFiles
 import os
+import openpyxl
+from tortoise.expressions import Q
 
 # Initialize FastAPI app
 app = FastAPI()
@@ -153,9 +157,27 @@ async def all_expenses(month: Optional[int] = None, year: Optional[int] = None):
                datetime.fromisoformat(expense["date"].replace("Z", "")).month == month and
                datetime.fromisoformat(expense["date"].replace("Z", "")).year == year
         ]
-        return JSONResponse(content={"status": "OK", "data": filtered_expenses})
+    else:
+        filtered_expenses = response_list
 
-    return JSONResponse(content={"status": "OK", "data": response_list})
+    # Ensure amount is always a float
+    total_expenditure = sum(float(expense.get("amount") or 0) for expense in filtered_expenses)
+
+    # Filter and sum non-essential expenses
+    non_essential_expenditure = sum(
+        float(expense.get("amount") or 0) for expense in filtered_expenses if not expense.get("really_needed", False)
+    )
+
+    # Essential expenditure = total - non-essential
+    essential_expenditure = total_expenditure - non_essential_expenditure
+
+    return JSONResponse(content={
+        "status": "OK",
+        "actual_total_expenditure": format_indian_currency(total_expenditure),  # Ensure this function handles numbers
+        "non_essential_expenditure": format_indian_currency(non_essential_expenditure),
+        "essential_expenditure": format_indian_currency(essential_expenditure),
+        "data": filtered_expenses
+    })
 
 @app.get('/dailyexpense/{id}')
 async def specific_expense(id: int):
@@ -166,6 +188,20 @@ async def specific_expense(id: int):
     expense_data = await DailyExpenseWithExpenseType.from_tortoise_orm(expense)
 
     # ✅ Convert Pydantic model to JSON-safe format
+    return JSONResponse(content={"status": "OK", "data": jsonable_encoder(expense_data)})
+
+@app.get("/search-expense/{name}")
+async def search_expense_by_product(name: str):
+    if len(name) < 3:
+        raise HTTPException(status_code=400, detail="Product name must be at least 4 characters long")
+
+    expenses = await DailyExpense.filter(Q(name__icontains=name)).select_related("expense_type")
+
+    if not expenses:
+        raise HTTPException(status_code=404, detail="No matching expenses found")
+
+    expense_data = [await DailyExpenseWithExpenseType.from_tortoise_orm(expense) for expense in expenses]
+
     return JSONResponse(content={"status": "OK", "data": jsonable_encoder(expense_data)})
 
 @app.post('/dailyexpense/{expensetype_id}')
@@ -261,6 +297,121 @@ async def get_chart_data(month: Optional[int] = None, year: Optional[int] = None
 #         "pieValues": [200, 300, 500],
 #         "lineValues": [400, 500, 450, 600],
 #     }
+
+@app.get('/download-report', response_class=Response)
+async def download_expense_report(
+    month: Optional[int] = Query(None), 
+    year: Optional[int] = Query(...)
+):
+    """
+    Generates an Excel (XLSX) report of expenses for the given month and year.
+    - If month is provided, it generates a **monthly report**.
+    - If month is omitted, it generates a **yearly report**.
+    """
+
+    # Fetch all expenses
+    query = DailyExpense.all().prefetch_related("expense_type")
+    response = await DailyExpenseWithExpenseType.from_queryset(query)
+    response_list = jsonable_encoder(response)
+
+    # Filter based on month & year 
+    filtered_expenses = [
+        expense for expense in response_list
+        if expense.get("date") and
+           datetime.fromisoformat(expense["date"].replace("Z", "")).year == year and
+           (month is None or datetime.fromisoformat(expense["date"].replace("Z", "")).month == month)
+    ]
+
+    if not filtered_expenses:
+        return JSONResponse(content={"status": "ERROR", "message": "No expenses found for the given period"})
+
+    # Create an Excel workbook and worksheet
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = f"Expenses_{year}_{month if month else 'FullYear'}"
+
+    # Add headers
+    headers = ["Date", "Category", "Amount"]
+    ws.append(headers)
+
+    # Ensure that amount is never None, defaulting to 0
+    total_expenditure = sum(expense.get("amount") or 0 for expense in filtered_expenses)
+
+    # Ensure that expenses without "really_needed" default to False
+    non_essential_expenditure = sum(
+        (expense.get("amount") or 0) for expense in filtered_expenses if not expense.get("really_needed", False)
+    )
+
+    # Essential expenditure (all expenses - non-essential expenses)
+    essential_expenditure = total_expenditure - non_essential_expenditure
+
+    # Add data to worksheet
+    for expense in filtered_expenses:
+        ws.append([
+            expense["date"].replace("T00:00:00Z",""),
+            expense["expense_type"]["name"],  # Assuming expense_type has a "name" field
+            expense["amount"]
+        ])
+
+    # Insert empty row before totals
+    ws.append([])
+
+    # Add totals
+    ws.append(["", "Actual Total Expenditure", total_expenditure])
+    ws.append(["", "Non-Essential Expenditure", non_essential_expenditure])
+    ws.append(["", "Desired Essential Expenditure", essential_expenditure])
+
+    # Save to an in-memory buffer
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    # Prepare response with Excel data
+    filename = f"expenses_{year}_{month if month else 'full_year'}.xlsx"
+    response = Response(content=output.getvalue(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response.headers["Content-Disposition"] = f"attachment; filename={filename}"
+
+    return response
+
+@app.delete('/delete-expenses')
+async def delete_expenses(
+    month: Optional[int] = Query(None), 
+    year: Optional[int] = Query(...)
+):
+    """
+    Deletes expenses for the given month and year.
+    - If month is provided, it deletes the **monthly records**.
+    - If month is omitted, it deletes the **entire year's records**.
+    """
+    
+    if year is None:
+        return JSONResponse(content={"status": "ERROR", "message": "Year is required"}, status_code=400)
+
+    # Create a filter condition for the year (and optionally for the month)
+    query_filter = Q(date__startswith=f"{year}-")
+    if month:
+        query_filter &= Q(date__startswith=f"{year}-{str(month).zfill(2)}")
+
+    # Count the number of records before deletion
+    count = await DailyExpense.filter(query_filter).count()
+
+    if count == 0:
+        return JSONResponse(content={"status": "ERROR", "message": "No records found to delete"}, status_code=404)
+
+    # Perform deletion
+    await DailyExpense.filter(query_filter).delete()
+
+    return JSONResponse(content={"status": "OK", "message": f"Deleted {count} records successfully"})
+
+def format_indian_currency(amount):
+    amount_str = f"{amount:,}"  # Default formatting with commas
+    parts = amount_str.split(",")
+
+    # Apply Indian number formatting
+    if len(parts) > 1:
+        return parts[0] + "," + ",".join(parts[1:]).replace(",", "")
+
+    return amount_str
 
 # Database Registration
 register_tortoise(

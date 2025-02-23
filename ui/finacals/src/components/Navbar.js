@@ -2,24 +2,41 @@ import {react, useContext, useState, useEffect} from "react";
 import {Navbar, Nav, Form, FormControl, Button, Badge} from 'react-bootstrap';
 import {Link} from  "react-router-dom";
 import { ExpenseContext } from "../ExpenseContext";
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faIndianRupeeSign } from '@fortawesome/free-solid-svg-icons';
 
 const NavBar = () => {
     const [search, setSearch] = useState("");
-    const [expenses, setExpenses] = useContext(ExpenseContext);
+    const { expense, setExpense, totals, setSearchError, setNavbarSearch } = useContext(ExpenseContext);
     const [user, setUser] = useState(null);
 
     const updateSearch = (e) => {
         setSearch(e.target.value);
     }
     
-    const filterExpense = (e) => {
+    const filterExpense = async (e) => {
       e.preventDefault()
-      const expense = expenses?.data?.filter(expense => 
-        expense?.name?.toLowerCase().startsWith(search?.toLowerCase())) || [];
-      setExpenses({"data" : [...expense]})
-  }
+      if (search?.length < 3) {
+        setSearchError("Please enter at least 3 characters for search");
+        return;
+      }
+      try {
+        let searchTerm = search.toLowerCase()
+        const response = await fetch(`http://127.0.0.1:8000/search-expense/${searchTerm}`);
+        const result = await response.json();
+  
+        if (result.status === "OK" && result.data.length > 0) {
+          setExpense({"data" : [...result.data]})
+          setSearchError("");
+          setNavbarSearch("y");
+        } else {
+          setExpense([]);
+          setSearchError("No matching expenses found");
+          setNavbarSearch("");
+        }
+      } catch (error) {
+        setSearchError("An error occurred while searching. Please try again");
+        setNavbarSearch("");
+      }
+    };
 
   const fetchUser = async () => {
     try {

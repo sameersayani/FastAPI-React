@@ -6,27 +6,32 @@ import { ExpenseContext } from "../ExpenseContext";
 import ExpenseRow from "./Expenses";
 import { useUpdateExpenseContext } from "../UpdateExpenseContext";
 import ConfirmDeleteModal from "./ConfirmDeleteModal";
+import DownloadReportModal from "./DownloadReportModal";
+import "./css/ExpenseList.css";
 
 const ExpensesList = () => {
   const [expenseType, setExpenseType] = useContext(ExpenseTypeContext);
-  const [expenses, setExpenses] = useContext(ExpenseContext);
   const [expenseToDelete, setExpenseToDelete] = useState(null);
   const { loadExpense } = useUpdateExpenseContext(); // Use loadExpense from the context
   const [isModalOpen, setIsModalOpen] = useState(false);
   
-    // Initialize current month and year
-    const currentDate = new Date();
-    const currentMonth = currentDate.getMonth() + 1; // Months are 0-indexed
-    const currentYear = currentDate.getFullYear();
-  
-    const [filters, setFilters] = useState({ month: currentMonth, year: currentYear });
-  
+  // Initialize current month and year
+  const currentDate = new Date();
+  const currentMonth = currentDate.getMonth() + 1; // Months are 0-indexed
+  const currentYear = currentDate.getFullYear();
+  const { expense, setExpense, totals, setTotals, filters, setFilters, searchError, setSearchError, navbarSearch, setNavbarSearch} = useContext(ExpenseContext);
+
+  const actualTotalExpenditure = totals?.actual_total_expenditure || "0";
+  const nonEssentialExpenditure = totals?.non_essential_expenditure || "0";
+  const essentialExpenditure = totals?.essential_expenditure || "0";
+
+  const [isDownloadModalOpen, setDownloadModalOpen] = useState(false);
 
   let navigate = useNavigate();
 
   const openModal = (expenseId) => {
-    const expense = expenses.data.find((expense) => expense.id === expenseId);
-    setExpenseToDelete(expense);
+    const expen = expense.data.find((expense) => expense.id === expenseId);
+    setExpenseToDelete(expen);
     setIsModalOpen(true);
   };
 
@@ -35,13 +40,29 @@ const ExpensesList = () => {
     setExpenseToDelete(null);
   };
 
+  //Clear error when component mounts
+  useEffect(() => {
+    setSearchError(""); // Clear error when ExpensesList loads
+  }, []); // Runs only on mount
+  
   const handleSearch = async () => {
     try {
       const response = await fetch(
         `http://127.0.0.1:8000/dailyexpense?month=${filters.month}&year=${filters.year}`
       );
       const result = await response.json();
-      setExpenses({ data: [...result.data] });
+
+      setExpense({
+        data: [...result.data] || [],
+      });
+
+      setTotals({
+        actual_total_expenditure: Number(result.actual_total_expenditure?.replace(/,/g, "")) || 0,
+        non_essential_expenditure: Number(result.non_essential_expenditure?.replace(/,/g, "")) || 0,
+        essential_expenditure: Number(result.essential_expenditure?.replace(/,/g, "")) || 0,
+      });
+      setSearchError("")
+      setNavbarSearch("")
     } catch (error) {
       console.error("Error fetching filtered expenses:", error);
     }
@@ -59,10 +80,16 @@ const ExpensesList = () => {
       .then((response) => response.json())
       .then((result) => {
         if (result.status === "OK") {
-          const updatedExpenses = expenses.data.filter(
+          const updatedExpenses = expense.data.filter(
             (expense) => expense.id !== expenseToDelete.id
           );
-          setExpenses({ ...expenses, data: updatedExpenses });
+          setExpense({
+            ...expense, // Keep existing totals
+            data: updatedExpenses, // Update only the data array
+          });
+
+          setSearchError("")
+          setNavbarSearch("")
         } else {
           alert("Failed to delete the expense !");
         }
@@ -89,24 +116,20 @@ const ExpensesList = () => {
     fetch(`http://127.0.0.1:8000/dailyexpense?${queryParams.toString()}`)
       .then((response) => response.json())
       .then((result) => {
-        setExpenses({ data: [...result.data] });
+        setExpense({
+          data: [...result.data],
+          actual_total_expenditure: result.actual_total_expenditure || 0,
+          non_essential_expenditure: result.non_essential_expenditure || 0,
+          essential_expenditure: result.essential_expenditure || 0,
+        });
       })
       .catch((error) => console.error("Error fetching expenses:", error));
   };
-
-  // useEffect(() => {
-  //   fetch("http://127.0.0.1:8000/dailyexpense")
-  //     .then((response) => {
-  //       return response.json();
-  //     })
-  //     .then((result) => {
-  //       setExpenses({ data: [...result.data] });
-  //     });
-  // }, []);
   
-  useEffect(() => {
-    fetchExpenses();
-  }, [filters]);
+ useEffect(() => {
+  fetchExpenses();  // Fetch data when filters change
+}, [filters.month, filters.year]); 
+
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
@@ -114,7 +137,7 @@ const ExpensesList = () => {
   };
 
   return (
-    <div className="p-1">
+    <div className="p-1">    
     {/* Filter Section */}
     <div className="flex flex-col items-start space-y-4 mb-6">
     <div className="p-1">
@@ -159,13 +182,29 @@ const ExpensesList = () => {
           ))}
         </select>
       </div>
-
+      <div className="flex flex-col min-h-[55px] justify-end">
       <button
         onClick={handleSearch}
         className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 self-end"
       >
         Search
       </button>
+      </div>
+      <div className="flex flex-col min-h-[100px] justify-end">
+      {/* Download Report Button */}
+        <button
+          onClick={() => setDownloadModalOpen(true)}
+          className="mb-4 px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600"
+        >
+          Download Report
+        </button>
+
+        {/* Render the Modal */}
+        <DownloadReportModal
+          isOpen={isDownloadModalOpen}
+          onClose={() => setDownloadModalOpen(false)}
+        />  
+      </div>
     </div>
 </div>
 
@@ -179,44 +218,67 @@ const ExpensesList = () => {
       </p>
     </div>
 
+    {searchError && <p className="text-red-500">{searchError}</p>}
     {/* Expenses Table */}
-    <Table striped bordered hover className="shadow-md">
-      <thead>
-        <tr>
-          <th>Expense Date</th>
-          <th>Product Name</th>
-          <th>Quantity Purchased</th>
-          <th>Unit Price</th>
-          <th>Amount</th>
-          <th>Really Needed?</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-      {expenses.data.length > 0 ? (
-        expenses.data.map((expense) => (
-          <ExpenseRow
-            id={expense.id}
-            date={expense.date.split("T")[0]}
-            name={expense.name}
-            quantity_purchased={expense.quantity_purchased}
-            unit_price={expense.unit_price}
-            amount={expense.amount}
-            really_needed={expense.really_needed ? "yes" : "no"}
-            key={expense.id}
-            handleDelete={handleDelete}
-            handleUpdate={handleUpdate}
-            openModal={openModal}
-          />
-        ))): (
+    <div className="fixed-table-container">
+      <Table striped bordered hover className="shadow-md">
+        <thead>
           <tr>
-            <td colSpan="7" className="text-center">
-              No records found
-            </td>
+            <th>Expense Date</th>
+            <th>Product Name</th>
+            <th>Quantity Purchased</th>
+            <th>Unit Price</th>
+            <th>Amount</th>
+            <th>Really Needed?</th>
+            <th></th>
           </tr>
-        )}
-      </tbody>
-    </Table>
+        </thead>
+        <tbody>
+          {expense?.data?.length > 0 ? (
+            expense.data.map((expense) => (
+              <ExpenseRow
+                key={expense.id}
+                id={expense.id}
+                date={expense.date.split("T")[0]}
+                name={expense.name}
+                quantity_purchased={expense.quantity_purchased}
+                unit_price={expense.unit_price}
+                amount={expense.amount}
+                really_needed={expense.really_needed ? "yes" : "no"}
+                handleDelete={handleDelete}
+                handleUpdate={handleUpdate}
+                openModal={openModal}
+              />
+            ))
+          ) : (
+            <tr>
+              <td colSpan="7" className="text-center">
+                No records found
+              </td>
+            </tr>
+          )}
+        </tbody>
+        {expense?.data?.length > 0 && navbarSearch =="" ? (
+        <tfoot>
+          <tr>
+            <td colSpan={3}></td>
+            <td>Actual Total </td>
+            <td colSpan={1}><strong>₹ {actualTotalExpenditure}</strong></td>
+          </tr>
+          <tr>
+            <td colSpan={3}></td>
+            <td style={{ color: "#FF0000" }}>Overspend </td>
+            <td style={{ color: "#FF0000" }} title="Overspend Amount is calculated based on your selection for Really Needed field as no"><strong>₹ {nonEssentialExpenditure}</strong></td>
+          </tr>
+          <tr>
+            <td colSpan={3}></td>
+            <td style={{ color: "#0000FF" }}>Desired Total </td>
+            <td style={{ color: "#0000FF" }}><strong>₹ {essentialExpenditure}</strong></td>
+          </tr>
+        </tfoot>
+        ) : (<tfoot></tfoot>)}
+      </Table>
+    </div>
 
     {/* Confirm Delete Modal */}
     <ConfirmDeleteModal
