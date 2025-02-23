@@ -53,7 +53,10 @@ const ExpensesList = () => {
   const handleSearch = async () => {
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/dailyexpense?month=${filters.month}&year=${filters.year}`
+        `http://127.0.0.1:8000/dailyexpense?month=${filters.month}&year=${filters.year}`, {
+        method: "GET",
+        credentials: "include"          
+        }
       );
       const result = await response.json();
 
@@ -78,6 +81,7 @@ const ExpensesList = () => {
 
     fetch(`http://127.0.0.1:8000/dailyexpense/${expenseToDelete.id}`, {
       method: "DELETE",
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
       },
@@ -119,7 +123,10 @@ const ExpensesList = () => {
     if (filters.month) queryParams.append("month", filters.month);
     if (filters.year) queryParams.append("year", filters.year);
 
-    fetch(`http://127.0.0.1:8000/dailyexpense?${queryParams.toString()}`)
+    fetch(`http://127.0.0.1:8000/dailyexpense?${queryParams.toString()}`, {
+      method: "GET",
+      credentials: "include"      
+    })
       .then((response) => response.json())
       .then((result) => {
         setExpense({

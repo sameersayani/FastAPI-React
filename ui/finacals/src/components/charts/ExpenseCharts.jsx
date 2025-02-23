@@ -69,7 +69,10 @@ const ExpenseCharts = () => {
     // if (filters.month) queryParams.append("month", filters.month);
     // if (filters.year) queryParams.append("year", filters.year);
 
-    fetch(`http://127.0.0.1:8000/chart-data?${queryParams.toString()}`)
+    fetch(`http://127.0.0.1:8000/chart-data?${queryParams.toString()}`, {
+      method: "GET",
+      credentials: "include"     
+    })
       .then((response) => response.json())
       .then(data => {
         const expenseData = data.data;  // Extract the data field from the API response

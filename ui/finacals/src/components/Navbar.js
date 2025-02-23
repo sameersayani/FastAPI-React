@@ -20,7 +20,10 @@ const NavBar = () => {
       }
       try {
         let searchTerm = search.toLowerCase()
-        const response = await fetch(`http://127.0.0.1:8000/search-expense/${searchTerm}`);
+        const response = await fetch(`http://127.0.0.1:8000/search-expense/${searchTerm}`, {
+          method: "GET",
+          credentials: "include"          
+        });
         const result = await response.json();
   
         if (result.status === "OK" && result.data.length > 0) {
@@ -41,7 +44,8 @@ const NavBar = () => {
   const fetchUser = async () => {
     try {
         const response = await fetch("http://127.0.0.1:8000/user", {
-            credentials: "include", // Important to send session cookies
+          method: "GET",
+          credentials: "include"
         });
 
         if (!response.ok) throw new Error("Not authenticated");
@@ -160,7 +164,7 @@ const NavBar = () => {
                         href="http://127.0.0.1:8000/login"
                         style={{
                             color: "green",
-                            fontSize: "14px",
+                            fontSize: "20px",
                             fontWeight: "bold",
                             textDecoration: "none",
                             cursor: "pointer",

@@ -22,7 +22,10 @@ export const ExpenseProvider = (props) => {
     if (filters.month) queryParams.append("month", filters.month);
     if (filters.year) queryParams.append("year", filters.year);
 
-    fetch(`http://127.0.0.1:8000/dailyexpense?${queryParams.toString()}`)
+    fetch(`http://127.0.0.1:8000/dailyexpense?${queryParams.toString()}`, {
+        method: "GET",
+        credentials: "include"
+    })
       .then((response) => response.json())
       .then((data) => {
         setExpense({ data: data.data || [] });

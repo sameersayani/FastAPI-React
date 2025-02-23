@@ -8,7 +8,10 @@ const ExpenseTypeList = ({ onExpenseTypeChange, selectedType }) => {
   useEffect(() => {
     const fetchExpenseTypes = async () => {
       try {
-        const response = await fetch("http://127.0.0.1:8000/expensetype");
+        const response = await fetch("http://127.0.0.1:8000/expensetype", {
+          method: "GET",
+          credentials: "include"         
+        });
         if (!response.ok) {
           throw new Error("Failed to fetch expense types.");
         }

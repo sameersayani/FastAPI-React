@@ -12,7 +12,10 @@ export const UpdateExpenseProvider = ({ children }) => {
     const loadExpense = async (id) => {
         setLoading(true);
         try {
-            const response = await fetch(`http://127.0.0.1:8000/dailyexpense/${id}`);
+            const response = await fetch(`http://127.0.0.1:8000/dailyexpense/${id}`, {
+                method: "GET",
+                credentials: "include"
+            });
             if (!response.ok) throw new Error("Failed to load expense.");
 
             const data = await response.json();
@@ -40,9 +43,10 @@ export const UpdateExpenseProvider = ({ children }) => {
                 return;
             }
 
-            const response = await fetch(`http://127.0.0.1:8000/dailyexpense/${id}`, {
+            const response = await fetch(`http://127.0.0.1:8000/dailyexpense/${id}` , {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
+                credentials: "include",
                 body: JSON.stringify({
                     date: updatedData.date,
                     name: updatedData.name,
