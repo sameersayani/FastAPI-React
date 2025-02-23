@@ -281,7 +281,7 @@ const ExpensesList = () => {
           </tr>
           <tr>
             <td colSpan={3}></td>
-            <td style={{ color: "#FF0000" }}>Overspend </td>
+            <td style={{ color: "#FF0000" }} title="Overspend Amount is calculated based on your selection for Really Needed field as no">Overspend </td>
             <td style={{ color: "#FF0000" }} title="Overspend Amount is calculated based on your selection for Really Needed field as no"><strong>₹ {nonEssentialExpenditure}</strong></td>
           </tr>
           <tr>
