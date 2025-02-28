@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import Modal from "react-modal";
+import {API_BASE_URL} from "../config";
 
 // Ensure modal is attached to root element
 Modal.setAppElement("#root");
@@ -29,7 +30,7 @@ const DownloadReportModal = ({ isOpen, onClose }) => {
   const [month, setMonth] = useState("");
 
   const handleDownload = () => {
-    let url = `http://127.0.0.1:8000/download-report?year=${year}`;
+    let url = `${API_BASE_URL}/download-report?year=${year}`;
     if (month) {
       url += `&month=${month}`;
     }

@@ -2,12 +2,13 @@ import {react, useContext, useState, useEffect} from "react";
 import {Navbar, Nav, Form, FormControl, Button, Badge} from 'react-bootstrap';
 import {Link} from  "react-router-dom";
 import { ExpenseContext } from "../ExpenseContext";
+import {API_BASE_URL} from "../config";
 
 const NavBar = () => {
     const [search, setSearch] = useState("");
     const { expense, setExpense, totals, setSearchError, setNavbarSearch } = useContext(ExpenseContext);
     const [user, setUser] = useState(null);
-
+    
     const updateSearch = (e) => {
         setSearch(e.target.value);
     }
@@ -20,7 +21,7 @@ const NavBar = () => {
       }
       try {
         let searchTerm = search.toLowerCase()
-        const response = await fetch(`http://127.0.0.1:8000/search-expense/${searchTerm}`, {
+        const response = await fetch(`${API_BASE_URL}/search-expense/${searchTerm}`, {
           method: "GET",
           credentials: "include"          
         });
@@ -43,7 +44,7 @@ const NavBar = () => {
 
   const fetchUser = async () => {
     try {
-        const response = await fetch("http://127.0.0.1:8000/user", {
+        const response = await fetch(`${API_BASE_URL}/user`, {
           method: "GET",
           credentials: "include"
         });
@@ -63,7 +64,7 @@ const NavBar = () => {
 
   // Logout function
   const handleLogout = () => {
-      window.location.href = "http://127.0.0.1:8000/logout"; // Redirects to FastAPI logout
+      window.location.href = `${API_BASE_URL}/logout`; // Redirects to FastAPI logout
   };
 
     return(
@@ -143,7 +144,7 @@ const NavBar = () => {
 
                         {/* Logout Button */}
                         <a 
-                            href="http://127.0.0.1:8000/logout" 
+                            href={`${API_BASE_URL}/logout`} 
                             style={{
                                 color: "orange",
                                 fontSize: "14px",
@@ -161,7 +162,7 @@ const NavBar = () => {
                     </div>
                 ) : (
                     <a 
-                        href="http://127.0.0.1:8000/login"
+                        href={`${API_BASE_URL}/login`}
                         style={{
                             color: "green",
                             fontSize: "20px",

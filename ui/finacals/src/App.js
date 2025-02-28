@@ -8,6 +8,7 @@ import ExpensesList from "./components/ExpensesList";
 import { UpdateExpenseProvider } from "./UpdateExpenseContext";
 import UpdateExpenseForm from "./components/UpdateExpense";
 import Dashboard from "./components/Dashboard";
+import {API_BASE_URL} from "./config";
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -37,7 +38,7 @@ function App() {
   const fetchTokenFromCode = async (code) => {
     try {
       // Call your backend API to exchange the code for an access token
-      const response = await fetch(`http://127.0.0.1:8000/api/auth/callback?code=${code}`);
+      const response = await fetch(`${API_BASE_URL}/api/auth/callback?code=${code}`);
       const data = await response.json();
       
       if (data.access_token) {

@@ -1,6 +1,7 @@
 import React, { useState, useContext } from 'react';
 import { Form, Button, Card } from 'react-bootstrap';
 import { SupplierContext } from '../SupplierContext';
+import {API_BASE_URL} from "../config";
 
 const SupplierPage = () => {
 	const [ supplierDetail, setSupplierDetail ] = useContext(SupplierContext);
@@ -83,7 +84,7 @@ const SupplierPage = () => {
 	};
 
 	const handleDelete = () => {
-		fetch('http://127.0.0.1:8000/supplier/' + supplierDetail['id'], {
+		fetch(`${API_BASE_URL}/supplier/` + supplierDetail['id'], {
 			method: 'DELETE',
 			headers: {
 				accept: 'application/json'

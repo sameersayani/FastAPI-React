@@ -1,5 +1,5 @@
 import { useState, createContext, useEffect } from "react";
-
+import {API_BASE_URL} from "./config";
 export const ExpenseContext = createContext();
 
 export const ExpenseProvider = (props) => {
@@ -22,7 +22,7 @@ export const ExpenseProvider = (props) => {
     if (filters.month) queryParams.append("month", filters.month);
     if (filters.year) queryParams.append("year", filters.year);
 
-    fetch(`http://127.0.0.1:8000/dailyexpense?${queryParams.toString()}`, {
+    fetch(`${API_BASE_URL}/dailyexpense?${queryParams.toString()}`, {
         method: "GET",
         credentials: "include"
     })

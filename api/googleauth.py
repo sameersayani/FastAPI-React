@@ -20,6 +20,10 @@ load_dotenv()
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 SECRET_KEY = os.getenv("SECRET_KEY")
+API_BASE_URL = os.environ.get('API_BASE_URL')
+REACT_BASE_URL = os.environ.get('REACT_BASE_URL')
+
+
 
 if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET or not SECRET_KEY:
     raise RuntimeError("Missing required environment variables")
@@ -47,37 +51,6 @@ oauth2_scheme = OAuth2AuthorizationCodeBearer(
 # Create APIRouter instance
 router = APIRouter()
 
-
-# @router.get("/api/auth/login")
-# async def login(request: Request):
-#     state = generate_state()
-#     request.session["state"] = state
-#     print(f"State set in session: {state}")
-#     redirect_uri = f"https://oauth2provider.com/auth?state={state}&redirect_uri=http://127.0.0.1:8000/api/auth/callback"
-#     return RedirectResponse(redirect_uri)
-
-# @router.get("/api/auth/callback")
-# async def callback(request: Request):
-#     state_received = request.query_params.get("state")
-#     state_stored = request.session.get("state")
-#     print(f"State received: {state_received}, State stored: {state_stored}")
-
-#     if state_received != state_stored:
-#         raise HTTPException(status_code=400, detail="CSRF attack detected")
-#     return {"message": "OAuth authentication successful"}
-
-# @router.get("/auth/logout", summary="Logout user")
-# async def logout(user_id: str):
-#     user_sessions.pop(user_id, None)
-#     return {"message": "Logged out successfully"}
-
-# @router.get("/protected", summary="Protected endpoint")
-# async def protected_endpoint(user_id: str):
-#     user = user_sessions.get(user_id)
-#     if not user:
-#         raise HTTPException(status_code=401, detail="Unauthorized")
-#     return {"message": "This is a protected route", "user": user}
-
 # Helper function to simulate Google Login and Redirect
 def generate_state():
     """Generate a random state string"""
@@ -87,7 +60,7 @@ def generate_state():
 async def login(request: Request):
     state = generate_state()
     request.session["state"] = state
-    redirect_uri = "http://127.0.0.1:8000/api/auth/callback"
+    redirect_uri = {API_BASE_URL} + "/api/auth/callback"
     google_auth_url = (
         f"https://accounts.google.com/o/oauth2/auth?"
         f"response_type=code&client_id={GOOGLE_CLIENT_ID}&redirect_uri={redirect_uri}"

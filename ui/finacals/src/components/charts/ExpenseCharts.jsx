@@ -5,6 +5,7 @@ import '../charts/charts.css';
 import {generateRandomColor} from './ColorHelper';
 import { useNavigate } from "react-router-dom";
 import { Link } from "react-router-dom";
+import {API_BASE_URL} from "../../config";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, LineElement, PointElement);
 
@@ -69,7 +70,7 @@ const ExpenseCharts = () => {
     // if (filters.month) queryParams.append("month", filters.month);
     // if (filters.year) queryParams.append("year", filters.year);
 
-    fetch(`http://127.0.0.1:8000/chart-data?${queryParams.toString()}`, {
+    fetch(`${API_BASE_URL}/chart-data?${queryParams.toString()}`, {
       method: "GET",
       credentials: "include"     
     })

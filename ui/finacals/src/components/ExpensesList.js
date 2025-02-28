@@ -8,6 +8,7 @@ import { useUpdateExpenseContext } from "../UpdateExpenseContext";
 import ConfirmDeleteModal from "./ConfirmDeleteModal";
 import DownloadReportModal from "./DownloadReportModal";
 import "./css/ExpenseList.css";
+import {API_BASE_URL} from "../config";
 
 const ExpensesList = () => {
   const [expenseType, setExpenseType] = useContext(ExpenseTypeContext);
@@ -53,7 +54,7 @@ const ExpensesList = () => {
   const handleSearch = async () => {
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/dailyexpense?month=${filters.month}&year=${filters.year}`, {
+        `${API_BASE_URL}/dailyexpense?month=${filters.month}&year=${filters.year}`, {
         method: "GET",
         credentials: "include"          
         }
@@ -79,7 +80,7 @@ const ExpensesList = () => {
   const handleDelete = () => {
     if (!expenseToDelete) return;
 
-    fetch(`http://127.0.0.1:8000/dailyexpense/${expenseToDelete.id}`, {
+    fetch(`${API_BASE_URL}/dailyexpense/${expenseToDelete.id}`, {
       method: "DELETE",
       credentials: "include",
       headers: {
@@ -123,7 +124,7 @@ const ExpensesList = () => {
     if (filters.month) queryParams.append("month", filters.month);
     if (filters.year) queryParams.append("year", filters.year);
 
-    fetch(`http://127.0.0.1:8000/dailyexpense?${queryParams.toString()}`, {
+    fetch(`${API_BASE_URL}/dailyexpense?${queryParams.toString()}`, {
       method: "GET",
       credentials: "include"      
     })

@@ -22,7 +22,7 @@ from starlette.requests import Request
 from dotenv import dotenv_values
 from typing import List, Optional
 from authlib.integrations.starlette_client import OAuth, OAuthError
-from api.config import CLIENT_ID, CLIENT_SECRET
+from api.config import CLIENT_ID, CLIENT_SECRET, API_BASE_URL, REACT_BASE_URL
 from fastapi.staticfiles import StaticFiles
 import os
 import openpyxl
@@ -46,7 +46,7 @@ app.add_middleware(
 # # CORS setup
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://127.0.0.1:3000"],  # Allow all origins
+    allow_origins=[os.getenv("REACT_BASE_URL", REACT_BASE_URL)],  # Allow all origins
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

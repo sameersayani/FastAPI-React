@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import ExpenseTypeist from "./ExpenseType";
 import DatePicker from "./DatePicker";
 import { useNavigate } from "react-router-dom";
+import {API_BASE_URL} from "../config";
 
 const AddExpenseForm = () => {
   const navigate = useNavigate();
@@ -92,7 +93,7 @@ const AddExpenseForm = () => {
 
     const { expense_type, ...payload } = formData;
     try {
-      const response = await fetch(`http://127.0.0.1:8000/dailyexpense/${formData.expense_type}`, {
+      const response = await fetch(`${API_BASE_URL}/dailyexpense/${formData.expense_type}`, {
         method: "POST",
         credentials: "include", 
         headers: {

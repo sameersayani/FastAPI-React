@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState } from "react";
+import {API_BASE_URL} from "./config";
 
 const UpdateExpenseContext = createContext();
 
@@ -12,7 +13,7 @@ export const UpdateExpenseProvider = ({ children }) => {
     const loadExpense = async (id) => {
         setLoading(true);
         try {
-            const response = await fetch(`http://127.0.0.1:8000/dailyexpense/${id}`, {
+            const response = await fetch(`${API_BASE_URL}/dailyexpense/${id}`, {
                 method: "GET",
                 credentials: "include"
             });
@@ -43,7 +44,7 @@ export const UpdateExpenseProvider = ({ children }) => {
                 return;
             }
 
-            const response = await fetch(`http://127.0.0.1:8000/dailyexpense/${id}` , {
+            const response = await fetch(`${API_BASE_URL}/dailyexpense/${id}` , {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: "include",
