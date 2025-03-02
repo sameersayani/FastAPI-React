@@ -50,6 +50,15 @@ const UpdateExpenseForm = ({ id, onCancel }) => {
     }));
   };
 
+  const handleRadioChange = (e) => {
+    const { value } = e.target;
+    setFormData({
+      ...formData,
+      really_needed: value === "true",
+    });
+    setErrors({ ...errors, really_needed: "" });
+  };
+
   const handleExpenseTypeChange = (typeId) => {
     setFormData((prev) => ({ ...prev, expense_type: typeId }));
     setErrors((prev) => ({ ...prev, expense_type: "" }));
@@ -133,6 +142,29 @@ const UpdateExpenseForm = ({ id, onCancel }) => {
         <input type="number" name="quantity_purchased" placeholder="Quantity" value={formData.quantity_purchased} onChange={handleInputChange} className="w-full p-3 border rounded-md" />
         <input type="number" name="unit_price" placeholder="Unit Price" value={formData.unit_price} onChange={handleInputChange} className="w-full p-3 border rounded-md" />
         <input type="number" name="amount" placeholder="Amount" value={formData.amount} onChange={handleInputChange} className="w-full p-3 border rounded-md" />
+        <label className="text-sm font-medium text-gray-700">Really need?</label>
+        <label className="flex items-center space-x-2">
+          <input
+            type="radio"
+            name="really_needed"
+            value="true"
+            onChange={handleRadioChange}
+            checked={formData.really_needed === true}
+            className="form-radio text-blue-500"
+          />
+           <span className="text-sm">Yes</span>
+          </label>
+          <label className="flex items-center space-x-2">
+            <input
+              type="radio"
+              name="really_needed"
+              value="false"
+              onChange={handleRadioChange}
+              checked={formData.really_needed === false}
+              className="form-radio text-red-500"
+            />
+            <span className="text-sm">No</span>
+          </label>
         <button type="submit" className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700">{loading ? "Updating..." : "Update Expense"}</button>
         <span className="mx-4 space-y-4">&nbsp;</span>
         <button

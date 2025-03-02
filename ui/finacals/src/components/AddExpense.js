@@ -14,6 +14,7 @@ const AddExpenseForm = () => {
     amount: 0,
     really_needed: false,
     expense_type: null,
+    user_email: ""
   });
 
   const [loading, setLoading] = useState(false);
@@ -151,6 +152,29 @@ const AddExpenseForm = () => {
             Amount
           </label>
         <input type="number" name="amount" placeholder="Amount" value={formData.amount} onChange={handleInputChange} className="w-full p-3 border rounded-md" />
+        <label className="text-sm font-medium text-gray-700">Really need?</label>
+        <label className="flex items-center space-x-2">
+          <input
+            type="radio"
+            name="really_needed"
+            value="true"
+            onChange={handleRadioChange}
+            checked={formData.really_needed === true}
+            className="form-radio text-blue-500"
+          />
+           <span className="text-sm">Yes</span>
+          </label>
+          <label className="flex items-center space-x-2">
+            <input
+              type="radio"
+              name="really_needed"
+              value="false"
+              onChange={handleRadioChange}
+              checked={formData.really_needed === false}
+              className="form-radio text-red-500"
+            />
+            <span className="text-sm">No</span>
+          </label>
         <button type="submit" className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700">{loading ? "Saving..." : "Add Expense"}</button>
         <span class="mx-4 space-y-4">&nbsp;</span>
         <button
