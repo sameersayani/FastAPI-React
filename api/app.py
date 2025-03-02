@@ -22,7 +22,7 @@ from starlette.requests import Request
 from dotenv import dotenv_values
 from typing import List, Optional
 from authlib.integrations.starlette_client import OAuth, OAuthError
-from api.config import CLIENT_ID, CLIENT_SECRET, API_BASE_URL, REACT_BASE_URL
+from api.config import CLIENT_ID, CLIENT_SECRET, API_BASE_URL, DATABASE_URL, REACT_BASE_URL
 from fastapi.staticfiles import StaticFiles
 import os
 import openpyxl
@@ -517,11 +517,19 @@ async def custom_swagger_ui(user: dict = Depends(get_current_user)):
 async def protected(user: dict = Depends(get_current_user)):
     return {"message": f"Hello, {user['given_name']}!"}
 
-# Database Registration
+# # Database Registration
+# register_tortoise(
+#     app,
+#     db_url="sqlite://database.sqlite3",
+#     modules={"models": ["models"]},
+#     generate_schemas=True,
+#     add_exception_handlers=True
+# )
+
 register_tortoise(
     app,
-    db_url="sqlite://database.sqlite3",
-    modules={"models": ["models"]},
-    generate_schemas=True,
-    add_exception_handlers=True
+    db_url="postgres://postgres:sameer@localhost:5432/smartexpensedb",  # Update with your DB credentials
+    modules={"models": ["models"]},  # Replace "models" with your actual model module
+    generate_schemas=True,  # Automatically generate tables
+    add_exception_handlers=True,
 )
