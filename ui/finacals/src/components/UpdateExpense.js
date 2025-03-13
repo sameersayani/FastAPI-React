@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 
 const UpdateExpenseForm = ({ id, onCancel }) => {
   const navigate = useNavigate();
+  const [showModal, setShowModal] = useState(false);
   const { expenseData, loadExpense, updateExpense } = useUpdateExpenseContext();
   const [formData, setFormData] = useState({
     date: "",
@@ -102,11 +103,15 @@ const UpdateExpenseForm = ({ id, onCancel }) => {
       setErrors(validationErrors);
       return;
     }
+    setShowModal(true);
+  }
 
+  const confirmSubmission = async () => {
+    setShowModal(false);
     setLoading(true);
-    setError("");
+    setErrors({});
+    setError(null);
     setSuccessMessage("");
-
     try {
       const updatedData = {
         date: formData.date,
@@ -180,6 +185,21 @@ const UpdateExpenseForm = ({ id, onCancel }) => {
       ))}
       {successMessage && <p className="text-green-500 text-sm mb-2">{successMessage}</p>}
       </form>
+
+      {showModal && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white p-6 rounded-md shadow-lg">
+            <h2 className="text-xl font-bold">Are You Sure to update this expense ?</h2>
+            <p className="mt-2 text-lg font-bold text-orange-700 bg-orange-100 border-l-4 border-orange-500 p-2 rounded-md animate-pulse">
+              ⚠️ Make sure you really need this product or service!
+            </p>
+            <div className="mt-4 flex justify-end">
+              <button onClick={() => setShowModal(false)} className="mr-4 bg-gray-300 px-4 py-2 rounded-md hover:bg-gray-400">Cancel</button>
+              <button onClick={confirmSubmission} className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Yes, Submit</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

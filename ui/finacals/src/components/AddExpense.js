@@ -6,6 +6,7 @@ import {API_BASE_URL} from "../config";
 
 const AddExpenseForm = () => {
   const navigate = useNavigate();
+  const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split("T")[0],
     name: "",
@@ -86,11 +87,15 @@ const AddExpenseForm = () => {
       setErrors(validationErrors);
       return;
     }
+    setShowModal(true);
+  }
 
+ const confirmSubmission = async () => {
+    setShowModal(false);
+    setLoading(true);
     setErrors({});
     setError(null);
     setSuccessMessage("");
-    setLoading(true);
 
     const { expense_type, ...payload } = formData;
     try {
@@ -175,7 +180,7 @@ const AddExpenseForm = () => {
             />
             <span className="text-sm">No</span>
           </label>
-        <button type="submit" className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700">{loading ? "Saving..." : "Add Expense"}</button>
+        <button type="submit"  className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700">{loading ? "Saving..." : "Add Expense"}</button>
         <span class="mx-4 space-y-4">&nbsp;</span>
         <button
           type="button"
@@ -191,6 +196,21 @@ const AddExpenseForm = () => {
           ))}
           {successMessage && <p className="text-green-500 text-sm mb-2">{successMessage}</p>}
       </form>
+
+      {showModal && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white p-6 rounded-md shadow-lg">
+            <h2 className="text-xl font-bold">Are You Sure to save this expense ?</h2>
+            <p className="mt-2 text-lg font-bold text-orange-700 bg-orange-100 border-l-4 border-orange-500 p-2 rounded-md animate-pulse">
+              ⚠️ Make sure you really need this product or service!
+            </p>
+            <div className="mt-4 flex justify-end">
+              <button onClick={() => setShowModal(false)} className="mr-4 bg-gray-300 px-4 py-2 rounded-md hover:bg-gray-400">Cancel</button>
+              <button onClick={confirmSubmission} className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Yes, Submit</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
