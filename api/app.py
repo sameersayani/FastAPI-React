@@ -22,7 +22,7 @@ from starlette.requests import Request
 from dotenv import dotenv_values
 from typing import List, Optional
 from authlib.integrations.starlette_client import OAuth, OAuthError
-from api.config import CLIENT_ID, CLIENT_SECRET, API_BASE_URL, DATABASE_URL, REACT_BASE_URL
+from config import CLIENT_ID, CLIENT_SECRET, API_BASE_URL, DATABASE_URL, REACT_BASE_URL
 from fastapi.staticfiles import StaticFiles
 import os
 import openpyxl
