@@ -28,6 +28,7 @@ import os
 import openpyxl
 from tortoise.expressions import Q
 from fastapi.openapi.docs import get_swagger_ui_html
+from config import DATABASE_URL
 
 # Initialize FastAPI app
 app = FastAPI()
@@ -526,7 +527,7 @@ async def protected(user: dict = Depends(get_current_user)):
 #     add_exception_handlers=True
 # )
 
-db_url = os.getenv("DATABASE_URL")
+db_url = DATABASE_URL ##os.getenv("DATABASE_URL")
 register_tortoise(
     app,
     db_url=db_url,  # Update with your DB credentials
