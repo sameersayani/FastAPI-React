@@ -7,7 +7,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
-from fastapi.staticfiles import StaticFiles
+from starlette.staticfiles import StaticFiles
 from fastapi.encoders import jsonable_encoder
 from fastapi.templating import Jinja2Templates
 from tortoise.contrib.fastapi import register_tortoise
@@ -29,9 +29,11 @@ import openpyxl
 from tortoise.expressions import Q
 from fastapi.openapi.docs import get_swagger_ui_html
 
+static_dir = os.path.join(os.path.dirname(__file__), "static")
 # Initialize FastAPI app
 app = FastAPI()
 
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 # Middleware for sessions
 ##app.add_middleware(SessionMiddleware, secret_key=os.getenv("SECRET_KEY", "default_secret_key"), same_site="lax")
 # ✅ Add SessionMiddleware FIRST
