@@ -1,25 +1,14 @@
+import os
 import uvicorn
-from fastapi import FastAPI, APIRouter
-from fastapi.templating import Jinja2Templates
-from starlette.requests import Request
-
-app = FastAPI()
-# router = APIRouter()
-# app.include_router(router)
-
-templates = Jinja2Templates(directory="templates")
+from app import app  # Importing FastAPI instance from app module
+from mangum import Mangum  # Required for Passenger (ASGI compatibility)
 
 if __name__ == "__main__":
     uvicorn.run(
-        app="app:app",
-        host="localhost",
-        port=8000,
-        reload=True
+        app,
+        host="0.0.0.0",  # Required for cPanel
+        port=int(os.environ.get("PORT", 8000)),  # Fetch port dynamically
+        reload=False  # Disable auto-reload in production
     )
-
-@app.get("/")
-def index(request: Request):
-    return templates.TemplateResponse(
-        name="home.html",
-        context={"request": request}
-    )
+else:
+    application = Mangum(app)  # Required for cPanel's Passenger

@@ -4,15 +4,15 @@ import {ProductContext} from "../ProductContext";
 import ProductRow from "./products";
 import {useHistory} from "react-router-dom";
 import { UpdateContext } from "../UpdateProductContext";
+import {API_BASE_URL} from "../config";
 
 const ProductsList = () => {
     const[products, setProducts] = useContext(ProductContext);
     const[updateProductInfo, setUpdateProductInfo] = useContext(UpdateContext);
-
     let history = useHistory();
 
     const handleDelete = (id) => {
-        fetch("http://127.0.0.1:8000/product/"+ id, {
+        fetch(`${API_BASE_URL}/product/`+ id, {
             method: "DELETE",
             headers:{
                 accept: "application/json"
@@ -48,7 +48,7 @@ const ProductsList = () => {
         }
 
     useEffect(() => {
-        fetch("http://127.0.0.1:8000/product")
+        fetch(`${API_BASE_URL}/product`)
         .then(response => {
             return response.json();
         }).then(result => {

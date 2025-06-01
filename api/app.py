@@ -1,285 +1,536 @@
-from fastapi import FastAPI, APIRouter, HTTPException
-from tortoise.contrib.fastapi import register_tortoise, HTTPNotFoundError
-from models import (DailyExpenseUpdate, supplier_pydantic, supplier_pydantic_in, Supplier, 
-                    product_pydantic, product_pydantic_in, Product,
-                    expensetpye_pydantic, expensetpye_pydantic_in, ExpenseType,
-                    daily_expense_pydantic, daily_expense_pydantic_in, DailyExpense, DailyExpenseWithExpenseType)
-from fastapi.security import OAuth2PasswordBearer
+from collections import defaultdict
+from datetime import datetime
+import io
+import json
+from fastapi import FastAPI, APIRouter, HTTPException, Query, Depends, Response, requests, status
+from starlette.middleware.sessions import SessionMiddleware
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.encoders import jsonable_encoder
 from fastapi.templating import Jinja2Templates
+from tortoise.contrib.fastapi import register_tortoise
+from models import (
+    DailyExpenseUpdate,
+    expensetpye_pydantic, expensetpye_pydantic_in, ExpenseType, ExpenseTypeUpdate,
+    daily_expense_pydantic, daily_expense_pydantic_in,
+    DailyExpense, DailyExpenseWithExpenseType
+)
 from starlette.requests import Request
 
-#email
-from typing import List
-from fastapi_mail import ConnectionConfig, FastMail, MessageSchema, MessageType
-from pydantic import BaseModel, EmailStr
-#from starlette.responses import JSONResponse
-
-#dotenv
 from dotenv import dotenv_values
-
-#credentials
-credentials = dotenv_values(".env")
-
-#CORS
-from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.sessions import SessionMiddleware
-from googleauth import router as google_auth_router
+from typing import List, Optional
+from authlib.integrations.starlette_client import OAuth, OAuthError
+from api.config import CLIENT_ID, CLIENT_SECRET, API_BASE_URL, DATABASE_URL, REACT_BASE_URL
+from fastapi.staticfiles import StaticFiles
 import os
+import openpyxl
+from tortoise.expressions import Q
+from fastapi.openapi.docs import get_swagger_ui_html
 
-class EmailSchema(BaseModel):
-    email: List[EmailStr]
+# Initialize FastAPI app
+app = FastAPI()
 
-class EmailContent(BaseModel):
-     message: str
-     subject: str   
-
-conf = ConnectionConfig(
-    MAIL_USERNAME = credentials["USERNAME"],
-    MAIL_PASSWORD = credentials["PASSWORD"],
-    MAIL_FROM = credentials["EMAIL"],
-    MAIL_PORT = 587,
-    MAIL_SERVER = "smtp.ethereal.email",
-    MAIL_STARTTLS = True,
-    MAIL_SSL_TLS = False,
-    USE_CREDENTIALS = True,
-    VALIDATE_CERTS = True
+# Middleware for sessions
+##app.add_middleware(SessionMiddleware, secret_key=os.getenv("SECRET_KEY", "default_secret_key"), same_site="lax")
+# ✅ Add SessionMiddleware FIRST
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.getenv("SECRET_KEY", CLIENT_SECRET),
+    session_cookie="session_id",  # ✅ Add a session cookie name
+    same_site="lax",
+    https_only=False  # Set to True in production
 )
 
-# Ensure SECRET_KEY is defined in your .env file
-SECRET_KEY = os.getenv("SECRET_KEY", "db11adfd7f008dcd8347e47fff1734bd77a59c80a4ad8ff2")
-app = FastAPI()
-# Add SessionMiddleware
-app.add_middleware(SessionMiddleware, secret_key="db11adfd7f008dcd8347e47fff1734bd77a59c80a4ad8ff2")
-# Include the auth router
-app.include_router(google_auth_router, prefix="/api", tags=["Authentication"])
-
-#adding CORS urls
-origins = [
-     "http://127.0.0.1:8000",
-     "http://127.0.0.1:8000"
-     "http://127.0.0.1:3000"
-]
-
-#add middleware
+# # CORS setup
 app.add_middleware(
-     CORSMiddleware,
-     allow_origins = ["*"],
-     allow_credentials = True,
-     allow_methods = ["*"],
-     allow_headers = ["*"]
+    CORSMiddleware,
+    allow_origins=[os.getenv("REACT_BASE_URL", REACT_BASE_URL)],  # Allow all origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+oauth = OAuth()
+oauth.register(
+    name='google',
+    server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
+    client_id=CLIENT_ID,
+    client_secret=CLIENT_SECRET,
+    client_kwargs={
+        'scope': 'email openid profile',
+        # 'redirect_url': 'http://localhost:8000/auth'
+    }
 )
 
 templates = Jinja2Templates(directory="templates")
 
-# oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-# GOOGLE_CLIENT_ID = credentials["GOOGLE_CLIENT_ID"]
-# GOOGLE_CLIENT_SECRET = credentials["GOOGLE_CLIENT_SECRET"]
-# GOOGLE_REDIRECT_URI = credentials["GOOGLE_REDIRECT_URI"]
+# async def get_current_user(request: Request):
+#     if "session" not in request.scope:
+#         raise HTTPException(
+#             status_code=500,
+#             detail="SessionMiddleware is not properly configured. Restart the server."
+#         )
 
+#     user = request.session.get("user")
+#     if not user:
+#         raise HTTPException(status_code=401, detail="Unauthorized. Please log in.")
 
-# @app.get('/')
-# def index():
-#     return {"Msg": "for documentation, visit /docs"} 
+#     return user
+
+async def get_current_user(request: Request):
+    user = request.session.get("user")
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return user
+
 @app.get("/")
 def index(request: Request):
+    user = request.session.get('user')
+    if user:
+        return RedirectResponse('welcome')
+
     return templates.TemplateResponse(
         name="home.html",
         context={"request": request}
     )
 
-@app.post('/supplier')
-async def app_supplier(supplier_info: supplier_pydantic_in):
-     supplier_obj = await Supplier.create(**supplier_info.dict(exclude_unset=True))
-     response = await supplier_pydantic.from_tortoise_orm(supplier_obj)
-     return {"status": "OK", "data" : response}
+@app.get('/welcome')
+def welcome(request: Request):
+    user = request.session.get('user')
+    if not user:
+        return RedirectResponse('/')
+    return templates.TemplateResponse(
+        name='welcome.html',
+        context={'request': request, 'user': user}
+    )
 
-@app.get("/supplier")
-async def get_all_supplier():
-     response = await supplier_pydantic.from_queryset(Supplier.all())
-     return {"status": "OK", "data" : response}
+@app.get("/login")
+async def login(request: Request):
+    url = request.url_for('auth')
+    return await oauth.google.authorize_redirect(request, url)
 
-@app.get("/supplier/{supplier_id}")
-async def get_specific_supplier(supplier_id: int):
-     response = await supplier_pydantic.from_queryset_single(Supplier.get(id=supplier_id))
-     return {"status": "OK", "data" : response}
+@app.get('/auth')
+async def auth(request: Request):
+    try:
+        token = await oauth.google.authorize_access_token(request)
+    except OAuthError as e:
+        return templates.TemplateResponse(
+            name='error.html',
+            context={'request': request, 'error': e.error}
+        )
+    
+    user = token.get('userinfo')
+    if user:
+        request.session['user'] = dict(user)
 
-@app.put("/supplier/{supplier_id}")
-async def update_supplier(supplier_id: int, update_info: supplier_pydantic_in):
-     supplier =  await Supplier.get(id=supplier_id)
-     update_info = update_info.dict(exclude_unset=True)
-     supplier.name = update_info['name']
-     supplier.company = update_info['company']
-     supplier.phone = update_info['phone']
-     supplier.email = update_info['email']
-     response = await supplier_pydantic.from_tortoise_orm(supplier)
-     return {"status": "OK", "data" : response} 
+    return RedirectResponse("http://127.0.0.1:3000/")
 
-@app.delete("/supplier/{supplier_id}")
-async def delete_supplier(supplier_id: int):
-     await Supplier.filter(id=supplier_id).delete()
-     return {"status": "OK"} 
+@app.get("/user")
+def get_user(request: Request, user: dict = Depends(get_current_user)):
+    user = request.session.get("user")
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return JSONResponse(content={"user": user})
 
-@app.post('/product/{supplier_id}')
-async def add_product(supplier_id: int, product_details: product_pydantic_in):
-    supplier = await Supplier.get(id = supplier_id)
-    product_details = product_details.dict(exclude_unset = True)
-    product_details["revenue"] = product_details["quantity_sold"] * product_details["unit_price"]
-    product_obj = await Product.create(**product_details, supplied_by = supplier)
-    response = await product_pydantic.from_tortoise_orm(product_obj)
-    return {"status": "OK", "data": response} 
+@app.get('/logout')
+def logout(request: Request, user: dict = Depends(get_current_user)):
+    request.session.pop('user')
+    request.session.clear()
+    return RedirectResponse('/')
 
-@app.get('/product')
-async def all_products():
-     response = await product_pydantic.from_queryset(Product.all())
-     return {"status": "OK", "data": response}
+# Health Check
+@app.get("/api/health")
+def health_check():
+    return {"status": "API is working!"}
 
-@app.get('/product/{id}')
-async def specific_product(id: int):
-     response = await product_pydantic.from_queryset_single(Product.get(id = id))
-     return {"status": "OK", "data": response}
-
-@app.put('/product/{id}')
-async def update_product(id: int, update_info: product_pydantic_in):
-     product = await Product.get(id=id)
-     update_info = update_info.dict(exclude_unset=True)
-     product.name = update_info['name']
-     product.quantity_in_stock = update_info['quantity_in_stock']
-     product.revenue =  int(update_info['quantity_sold']) * float(update_info['unit_price'])
-     product.quantity_sold += int(update_info['quantity_sold'])
-     product.unit_price = update_info['unit_price']
-     await product.save()
-     response = await product_pydantic.from_tortoise_orm(product)
-     return {"status": "OK", "data": response}
-
-@app.delete("/product/{id}")
-async def delete_product(id: int):
-     await Product.filter(id=id).delete()
-     return {"status": "OK"} 
-
-
-@app.post("/email/{product_id}")
-async def send_email(product_id: int, content: EmailContent):
-    product = await Product.get(id = product_id)
-    supplier = await product.supplied_by
-    supplier_email = [supplier.email]
-
-    html = f"""
-    <h5>Business Email</h5>
-    <br/>
-    <p>{content.message}</p>
-    <br/>
-    <h6>Best Regards</h6>
-    <h6>John S</h6>  
-    """
-    message = MessageSchema(
-        subject=content.subject,
-        recipients=supplier_email,
-        body=html,
-        subtype=MessageType.html)
-
-    fm = FastMail(conf)
-    await fm.send_message(message)
-    # return JSONResponse(status_code=200, content={"message": "email has been sent"}) 
-    return {"status": "OK"}
-
+# Expense Type Endpoints
 @app.get("/expensetype")
-async def get_expensetype():
-     response = await expensetpye_pydantic.from_queryset(ExpenseType.all().order_by("name", "name"))
-     return {"status": "OK", "data" : response}
+async def get_expensetype(user: dict = Depends(get_current_user)):
+    query = ExpenseType.all().order_by("name")  # Don't await here
+    response = await expensetpye_pydantic.from_queryset(query)  # Await here instead
+    return response
 
 @app.get("/expensetype/{expensetype_id}")
-async def get_expensetype_by_id(expensetype_id: int):
-     response = await expensetpye_pydantic.from_queryset_single(ExpenseType.filter(id=expensetype_id).first())
-     return {"status": "OK", "data" : response}
+async def get_expensetype_by_id(expensetype_id: int, user: dict = Depends(get_current_user)):
+    response = await ExpenseType.get_or_none(id=expensetype_id)
+    if not response:
+        raise HTTPException(status_code=404, detail="Expense type not found")
+    return JSONResponse(content=jsonable_encoder(await expensetpye_pydantic.from_tortoise_orm(response)))
 
 @app.post('/expensetype')
-async def app_expensetype(expensetype_info: expensetpye_pydantic_in):
-     expensetype_obj = await ExpenseType.create(**expensetype_info.dict(exclude_unset=True))
-     response = await expensetpye_pydantic.from_tortoise_orm(expensetype_obj)
-     return {"status": "OK", "data" : response}
+async def add_expensetype(expensetype_info: expensetpye_pydantic_in, 
+                          user: dict = Depends(get_current_user)):
+    expensetype_obj = await ExpenseType.create(**expensetype_info.dict(exclude_unset=True))
+    return JSONResponse(content=jsonable_encoder(await expensetpye_pydantic.from_tortoise_orm(expensetype_obj)))
 
-router = APIRouter() 
 @app.put("/expensetype/{expensetype_id}")
-async def update_expensetype(expensetype_id: int, update_info: expensetpye_pydantic_in):
-     expensetype =  await ExpenseType.get(id=expensetype_id)
-     update_info = update_info.dict(exclude_unset=True)
-     expensetype.name = update_info['name']
-     await expensetype.save()
-     response = await expensetpye_pydantic.from_tortoise_orm(expensetype)
-     return {"status": "OK", "data" : response} 
+async def update_expensetype(expensetype_id: int, update_data: ExpenseTypeUpdate, user: dict = Depends(get_current_user)):
+    update_count = await ExpenseType.filter(id=expensetype_id).update(name=update_data.name)
+    
+    if update_count == 0:
+        raise HTTPException(status_code=404, detail="Expense type not found")
+
+    updated_expense_type = await ExpenseType.get(id=expensetype_id)  # Fetch updated data
+    return {"status": "OK", "data": jsonable_encoder(updated_expense_type)}
 
 @app.delete("/expensetype/{expensetype_id}")
-async def delete_expensetype(expensetype_id: int):
-     await ExpenseType.filter(id=expensetype_id).delete()
-     return {"status": "OK"} 
+async def delete_expensetype(expensetype_id: int, user: dict = Depends(get_current_user)):
+    deleted_count = await ExpenseType.filter(id=expensetype_id).delete()
+    if deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Expense type not found")
+    return {"status": "OK"}
 
+# Daily Expense Endpoints
 @app.get('/dailyexpense')
-async def all_expenses():
-     expenses = DailyExpense.all().prefetch_related('expense_type')
-     response = await DailyExpenseWithExpenseType.from_queryset(expenses)
-     return {"status": "OK", "data": response}
+async def all_expenses(month: Optional[int] = None, year: Optional[int] = None, 
+                       user: dict = Depends(get_current_user)):
+    user_email = user.get("email")
+    if not user_email:
+        raise HTTPException(status_code=401, detail="User authentication failed")
+
+    query = DailyExpense.filter(user_email=user_email).prefetch_related('expense_type')  
+    response = await DailyExpenseWithExpenseType.from_queryset(query)
+    response_list = jsonable_encoder(response)
+
+    if month and year:
+        filtered_expenses = [
+            expense for expense in response_list
+            if expense.get("date") and
+               datetime.fromisoformat(expense["date"].replace("Z", "")).month == month and
+               datetime.fromisoformat(expense["date"].replace("Z", "")).year == year
+        ]
+    else:
+        filtered_expenses = response_list
+
+    # Ensure amount is always a float
+    total_expenditure = sum(float(expense.get("amount") or 0) for expense in filtered_expenses)
+
+    # Filter and sum non-essential expenses
+    non_essential_expenditure = sum(
+        float(expense.get("amount") or 0) for expense in filtered_expenses if not expense.get("really_needed", False)
+    )
+
+    # Essential expenditure = total - non-essential
+    essential_expenditure = total_expenditure - non_essential_expenditure
+
+    return JSONResponse(content={
+        "status": "OK",
+        "actual_total_expenditure": format_indian_currency(total_expenditure),  # Ensure this function handles numbers
+        "non_essential_expenditure": format_indian_currency(non_essential_expenditure),
+        "essential_expenditure": format_indian_currency(essential_expenditure),
+        "data": filtered_expenses
+    })
 
 @app.get('/dailyexpense/{id}')
-async def specific_expense(id: int):
-     expense = await DailyExpense.get(id=id).select_related('expense_type')
-     response = await DailyExpenseWithExpenseType.from_tortoise_orm(expense)
-     return {"status": "OK", "data": response}
+async def specific_expense(id: int, user: dict = Depends(get_current_user)):
+    user_email = user.get("email")
+    if not user_email:
+        raise HTTPException(status_code=401, detail="User authentication failed")
 
-@app.delete("/dailyexpense/{dailyexpense_id}")
-async def delete_expense(dailyexpense_id: int):
-     await DailyExpense.filter(id=dailyexpense_id).delete()
-     return {"status": "OK"} 
-
-@app.post('/dailyexpense/{expensetype_id}')
-async def add_expense(expensetype_id: int, expense_details: daily_expense_pydantic_in):
-    expense_type = await ExpenseType.get(id = expensetype_id)
-    expense_details = expense_details.dict(exclude_unset = True)
-    if expense_details["unit_price"] > 0 and expense_details["amount"] == 0: 
-       expense_details["amount"] = expense_details["quantity_purchased"] * expense_details["unit_price"]
-    elif expense_details["amount"] > 0 and expense_details["unit_price"] == 0:
-       expense_details["amount"] = expense_details["amount"]
-    expense_obj = await DailyExpense.create(**expense_details, expense_type = expense_type)
-    response = await daily_expense_pydantic.from_tortoise_orm(expense_obj)
-    return {"status": "OK", "data": response}
-
-@app.put("/dailyexpense/{expense_id}")
-async def update_daily_expense(expense_id: int, expense: DailyExpenseUpdate):
-    db_expense = await DailyExpense.get_or_none(id=expense_id)
+    expense = await DailyExpense.get_or_none(Q(id=id) & Q(user_email=user_email)).select_related('expense_type')
     if not expense:
         raise HTTPException(status_code=404, detail="Expense not found")
 
-#     formatted_date = expense.date.strftime("%Y-%m-%d")
-    # Update fields, including expense_type_id
-    print(f"Expense: {expense}")
-    db_expense.date = expense.date
-    db_expense.name = expense.name
-    db_expense.quantity_purchased = expense.quantity_purchased
-    db_expense.unit_price = expense.unit_price
-    db_expense.amount = expense.amount
-    db_expense.really_needed = expense.really_needed
-    db_expense.expense_type_id = expense.expense_type_id  # Update the foreign key
+    expense_data = await DailyExpenseWithExpenseType.from_tortoise_orm(expense)
+
+    # ✅ Convert Pydantic model to JSON-safe format
+    return JSONResponse(content={"status": "OK", "data": jsonable_encoder(expense_data)})
+
+@app.get("/search-expense/{name}")
+async def search_expense_by_product(name: str, user: dict = Depends(get_current_user)):
+    user_email = user.get("email")
+    if not user_email:
+        raise HTTPException(status_code=401, detail="User authentication failed")
+
+    if len(name) < 3:
+        raise HTTPException(status_code=400, detail="Product name must be at least 4 characters long")
+
+    expenses = await DailyExpense.filter(Q(name__icontains=name) & Q(user_email=user_email)).select_related("expense_type")
+
+    if not expenses:
+        raise HTTPException(status_code=404, detail="No matching expenses found")
+
+    expense_data = [await DailyExpenseWithExpenseType.from_tortoise_orm(expense) for expense in expenses]
+
+    return JSONResponse(content={"status": "OK", "data": jsonable_encoder(expense_data)})
+
+@app.post('/dailyexpense/{expensetype_id}')
+async def add_expense(
+    expensetype_id: int, 
+    expense_details: daily_expense_pydantic_in, 
+    user: dict = Depends(get_current_user)
+):
+    user_email = user.get("email")
+    if not user_email:
+        raise HTTPException(status_code=401, detail="User authentication failed")
+
+    expense_type = await ExpenseType.get(id=expensetype_id)
+
+    # ✅ Convert Pydantic model to dictionary and add user_email
+    expense_data = expense_details.dict(exclude_unset=True)
+    expense_data["user_email"] = user_email  # ✅ Ensure user_email is set
+
+    # ✅ Business logic for amount calculation
+    if expense_data.get("unit_price", 0) > 0 and expense_data.get("amount", 0) == 0: 
+        expense_data["amount"] = expense_data["quantity_purchased"] * expense_data["unit_price"]
+
+    # ✅ Create expense (Make sure user_email is NOT passed separately)
+    expense_obj = await DailyExpense.create(**expense_data, expense_type=expense_type)
+
+    response = await daily_expense_pydantic.from_tortoise_orm(expense_obj)
+    return {"status": "OK", "data": response}
+
+@app.delete("/dailyexpense/{dailyexpense_id}")
+async def delete_expense(dailyexpense_id: int, user: dict = Depends(get_current_user)):
+    user_email = user.get("email")
+    if not user_email:
+        raise HTTPException(status_code=401, detail="User authentication failed")
+    expense = await DailyExpense.get_or_none(id=dailyexpense_id, user_email=user_email)
+    if not expense:
+        raise HTTPException(status_code=403, detail="Unauthorized or Expense not found")
+    await expense.delete()
+    return {"status": "OK", "message": "Expense deleted", "data": None}
+
+@app.put("/dailyexpense/{expense_id}")
+async def update_daily_expense(
+    expense_id: int, 
+    expense: DailyExpenseUpdate, 
+    user: dict = Depends(get_current_user)
+):
+    user_email = user.get("email")
+    if not user_email:
+        raise HTTPException(status_code=401, detail="User authentication failed")
+
+    db_expense = await DailyExpense.get_or_none(id=expense_id, user_email=user_email)
+    if not db_expense:
+        raise HTTPException(status_code=404, detail="Expense not found")
+
+    update_data = expense.dict(exclude_unset=True)
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No valid fields provided for update")
+
+    for key, value in update_data.items():
+        setattr(db_expense, key, value)
 
     await db_expense.save()
-    return db_expense
+    updated_expense = await daily_expense_pydantic.from_tortoise_orm(db_expense)
 
-# Override Swagger UI to include OAuth2 settings
-@app.get("/docs", include_in_schema=False)
-async def custom_swagger_ui():
-    return get_swagger_ui_html(
-        openapi_url=app.openapi_url,
-        title="Custom Swagger with Google OAuth2",
-        oauth2_redirect_url="http://127.0.0.1:8000/api/auth/callback",
+    return JSONResponse(content={"status": "OK", "data": jsonable_encoder(updated_expense)})
+
+## charts
+@app.get("/chart-data")
+async def get_chart_data(month: Optional[int] = None, year: Optional[int] = None, user: dict = Depends(get_current_user)):
+    user_email = user.get("email")
+    if not user_email:
+        raise HTTPException(status_code=401, detail="User authentication failed")
+    query = DailyExpense.filter(user_email=user_email).prefetch_related('expense_type')  
+    response = await DailyExpenseWithExpenseType.from_queryset(query)
+    response_list = jsonable_encoder(response)
+
+    if month and year:
+        filtered_expenses = [
+            expense for expense in response_list
+            if expense.get("date") and
+               datetime.fromisoformat(expense["date"].replace("Z", "")).month == month and
+               datetime.fromisoformat(expense["date"].replace("Z", "")).year == year
+        ]
+     # Group data
+    grouped_data = defaultdict(lambda: defaultdict(list))
+    for expense in filtered_expenses:
+        # Convert object to dictionary
+        expense_dict = dict(expense)
+
+        # Convert date to ISO format string if needed
+        raw_date = expense_dict['date']
+        if isinstance(raw_date, datetime):
+            raw_date = raw_date.isoformat()
+        expense_dict['date'] = raw_date
+
+        # Extract Year/Month and Expense Type
+        date = datetime.fromisoformat(raw_date).date()
+        year_month = date.strftime("%B %Y")  # Format as "Month Year" #f"{date.year}-{date.month:02d}"
+        expense_type = expense_dict['expense_type']['name']
+
+        ## Append expense to grouped structure
+        #grouped_data[year_month][expense_type].append(expense_dict)
+
+        filtered_expense = {
+            "name": expense_dict['name'],
+            "amount": expense_dict['amount'],
+            "really_needed": expense_dict['really_needed'],
+        }
+        grouped_data[year_month][expense_type].append(filtered_expense)
+       
+
+     # Transform defaultdict to regular dict for JSON serialization
+    grouped_dict = {
+          year_month: {
+               expense_type: expenses
+               for expense_type, expenses in types.items()
+          }
+          for year_month, types in grouped_data.items()
+     }
+
+    return JSONResponse(content={"data": grouped_dict}) 
+
+    # Example data
+#     data = {
+#         "labels": ["January", "February", "March", "April"],
+#         "barValues": [500, 700, 800, 600],
+#         "pieValues": [200, 300, 500],
+#         "lineValues": [400, 500, 450, 600],
+#     }
+
+@app.get('/download-report', response_class=Response)
+async def download_expense_report(
+    month: Optional[int] = Query(None), 
+    year: Optional[int] = Query(...),
+    user: dict = Depends(get_current_user)
+):
+    """
+    Generates an Excel (XLSX) report of expenses for the given month and year.
+    - If month is provided, it generates a **monthly report**.
+    - If month is omitted, it generates a **yearly report**.
+    """
+
+    # Fetch all expenses
+    user_email = user.get("email")
+    if not user_email:
+        raise HTTPException(status_code=401, detail="User authentication failed")
+    query = DailyExpense.filter(user_email=user_email).prefetch_related("expense_type")
+    response = await DailyExpenseWithExpenseType.from_queryset(query)
+    response_list = jsonable_encoder(response)
+
+    # Filter based on month & year 
+    filtered_expenses = [
+        expense for expense in response_list
+        if expense.get("date") and
+           datetime.fromisoformat(expense["date"].replace("Z", "")).year == year and
+           (month is None or datetime.fromisoformat(expense["date"].replace("Z", "")).month == month)
+    ]
+
+    if not filtered_expenses:
+        return JSONResponse(content={"status": "ERROR", "message": "No expenses found for the given period"})
+
+    # Create an Excel workbook and worksheet
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = f"Expenses_{year}_{month if month else 'FullYear'}"
+
+    # Add headers
+    headers = ["Date", "Category", "Amount"]
+    ws.append(headers)
+
+    # Ensure that amount is never None, defaulting to 0
+    total_expenditure = sum(expense.get("amount") or 0 for expense in filtered_expenses)
+
+    # Ensure that expenses without "really_needed" default to False
+    non_essential_expenditure = sum(
+        (expense.get("amount") or 0) for expense in filtered_expenses if not expense.get("really_needed", False)
     )
 
-# Include the OpenAPI redirect route for Swagger OAuth2
-@app.get("/oauth2-redirect", include_in_schema=False)
-async def oauth2_redirect():
-    return {"message": "Swagger OAuth2 Redirect"}
+    # Essential expenditure (all expenses - non-essential expenses)
+    essential_expenditure = total_expenditure - non_essential_expenditure
 
+    # Add data to worksheet
+    for expense in filtered_expenses:
+        ws.append([
+            expense["date"].replace("T00:00:00Z",""),
+            expense["expense_type"]["name"],  # Assuming expense_type has a "name" field
+            expense["amount"]
+        ])
+
+    # Insert empty row before totals
+    ws.append([])
+
+    # Add totals
+    ws.append(["", "Actual Total Expenditure", total_expenditure])
+    ws.append(["", "Non-Essential Expenditure", non_essential_expenditure])
+    ws.append(["", "Desired Essential Expenditure", essential_expenditure])
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    # Prepare response with Excel data
+    filename = f"expenses_{year}_{month if month else 'full_year'}.xlsx"
+    response = Response(content=output.getvalue(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response.headers["Content-Disposition"] = f"attachment; filename={filename}"
+
+    return response
+
+@app.delete('/delete-expenses')
+async def delete_expenses(
+    month: Optional[int] = Query(None), 
+    year: Optional[int] = Query(...),
+    user: dict = Depends(get_current_user)
+):
+    """
+    Deletes expenses for the given month and year.
+    - If month is provided, it deletes the **monthly records**.
+    - If month is omitted, it deletes the **entire year's records**.
+    """
+    
+    if year is None:
+        return JSONResponse(content={"status": "ERROR", "message": "Year is required"}, status_code=400)
+    user_email = user.get("email")
+    if not user_email:
+        raise HTTPException(status_code=401, detail="User authentication failed")
+    # Create a filter condition for the year (and optionally for the month)
+    query_filter = Q(user_email=user_email) & Q(date__startswith=f"{year}")
+    if month:
+        # ✅ Ensure proper formatting for month filtering (YYYY-MM)
+        month_str = f"{year}-{str(month).zfill(2)}"
+        query_filter &= Q(date__startswith=month_str)
+
+    # Count the number of records before deletion
+    count = await DailyExpense.filter(query_filter).count()
+
+    if count == 0:
+        return JSONResponse(content={"status": "ERROR", "message": "No records found to delete"}, status_code=404)
+
+    # Perform deletion
+    await DailyExpense.filter(query_filter).delete()
+
+    return JSONResponse(content={"status": "OK", "message": f"Deleted {count} records successfully"})
+
+def format_indian_currency(amount):
+    amount_str = f"{amount:,}"  # Default formatting with commas
+    parts = amount_str.split(",")
+
+    # Apply Indian number formatting
+    if len(parts) > 1:
+        return parts[0] + "," + ",".join(parts[1:]).replace(",", "")
+
+    return amount_str
+
+@app.get("/docs", include_in_schema=False)
+async def custom_swagger_ui(user: dict = Depends(get_current_user)):
+    """Restrict access to Swagger UI"""
+    return get_swagger_ui_html(openapi_url="/openapi.json", title="API Docs")
+
+@app.get("/protected-route")
+async def protected(user: dict = Depends(get_current_user)):
+    return {"message": f"Hello, {user['given_name']}!"}
+
+# # Database Registration
+# register_tortoise(
+#     app,
+#     db_url="sqlite://database.sqlite3",
+#     modules={"models": ["models"]},
+#     generate_schemas=True,
+#     add_exception_handlers=True
+# )
+
+db_url = os.getenv("DATABASE_URL")
 register_tortoise(
     app,
-    db_url="sqlite://database.sqlite3",
-    modules={"models" : ["models"]},
-    generate_schemas=True,
-    add_exception_handlers=True
+    db_url=db_url,  # Update with your DB credentials
+    modules={"models": ["models"]},  # Replace "models" with your actual model module
+    generate_schemas=True,  # Automatically generate tables
+    add_exception_handlers=True,
 )

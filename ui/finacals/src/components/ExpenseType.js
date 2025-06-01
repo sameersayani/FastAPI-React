@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import "./css/ExpenseType.css";
+import {API_BASE_URL} from "../config";
 
 const ExpenseTypeList = ({ onExpenseTypeChange, selectedType }) => {
   const [expenseTypes, setExpenseTypes] = useState([]);
@@ -8,13 +9,16 @@ const ExpenseTypeList = ({ onExpenseTypeChange, selectedType }) => {
   useEffect(() => {
     const fetchExpenseTypes = async () => {
       try {
-        const response = await fetch("http://127.0.0.1:8000/expensetype");
+        const response = await fetch(`${API_BASE_URL}/expensetype`, {
+          method: "GET",
+          credentials: "include"         
+        });
         if (!response.ok) {
           throw new Error("Failed to fetch expense types.");
         }
         const data = await response.json();
-        const types = Array.isArray(data.data) ? data.data : [];
-        setExpenseTypes(types);
+        //const types = Array.isArray(data.data) ? data.data : [];
+        setExpenseTypes(data);
       } catch (err) {
         setError(err.message);
       }
