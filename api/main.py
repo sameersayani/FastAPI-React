@@ -1,6 +1,6 @@
 import os
 import uvicorn
-from app import app  # Importing FastAPI instance from app module
+from .app import app  # Importing FastAPI instance from app module
 from mangum import Mangum  # Required for Passenger (ASGI compatibility)
 
 if __name__ == "__main__":
