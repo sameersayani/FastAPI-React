@@ -23,7 +23,6 @@ from dotenv import dotenv_values
 from typing import List, Optional
 from authlib.integrations.starlette_client import OAuth, OAuthError
 from api.config import CLIENT_ID, CLIENT_SECRET, API_BASE_URL, DATABASE_URL, REACT_BASE_URL
-from fastapi.staticfiles import StaticFiles
 import os
 import openpyxl
 from tortoise.expressions import Q
@@ -54,7 +53,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+##app.mount("/static", StaticFiles(directory="static"), name="static")
 
 oauth = OAuth()
 oauth.register(
