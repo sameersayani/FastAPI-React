@@ -22,13 +22,12 @@ from starlette.requests import Request
 from dotenv import dotenv_values
 from typing import List, Optional
 from authlib.integrations.starlette_client import OAuth, OAuthError
-from config import CLIENT_ID, CLIENT_SECRET, API_BASE_URL, DATABASE_URL, REACT_BASE_URL
+from api.config import CLIENT_ID, CLIENT_SECRET, API_BASE_URL, DATABASE_URL, REACT_BASE_URL
 from fastapi.staticfiles import StaticFiles
 import os
 import openpyxl
 from tortoise.expressions import Q
 from fastapi.openapi.docs import get_swagger_ui_html
-from config import DATABASE_URL
 
 # Initialize FastAPI app
 app = FastAPI()
@@ -527,7 +526,7 @@ async def protected(user: dict = Depends(get_current_user)):
 #     add_exception_handlers=True
 # )
 
-db_url = DATABASE_URL ##os.getenv("DATABASE_URL")
+db_url = os.getenv("DATABASE_URL")
 register_tortoise(
     app,
     db_url=db_url,  # Update with your DB credentials
