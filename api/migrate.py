@@ -9,7 +9,7 @@ async def init():
             },
             "apps": {
                 "models": {
-                    "models": ["models"],  # Make sure "models" is your actual model module
+                    "models": ["api.models"],  # Make sure "models" is your actual model module
                     "default_connection": "default"
                 }
             }
