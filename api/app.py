@@ -527,10 +527,10 @@ async def protected(user: dict = Depends(get_current_user)):
 #     add_exception_handlers=True
 # )
 
-db_url = os.getenv("DATABASE_URL")
+#db_url = os.getenv("DATABASE_URL")
 register_tortoise(
     app,
-    db_url=db_url,  # Update with your DB credentials
+    db_url=DATABASE_URL,  # Update with your DB credentials
     modules={"models": ["models"]},  # Replace "models" with your actual model module
     generate_schemas=True,  # Automatically generate tables
     add_exception_handlers=True,
