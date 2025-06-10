@@ -128,7 +128,7 @@ async def auth(request: Request):
     if user:
         request.session['user'] = dict(user)
 
-    return RedirectResponse("http://127.0.0.1:3000/")
+    return RedirectResponse(REACT_BASE_URL+"/")
 
 @app.get("/user")
 def get_user(request: Request, user: dict = Depends(get_current_user)):
