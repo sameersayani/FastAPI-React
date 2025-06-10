@@ -67,8 +67,7 @@ oauth.register(
     }
 )
 
-templates = Jinja2Templates(directory="templates")
-
+templates = templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 # async def get_current_user(request: Request):
 #     if "session" not in request.scope:
 #         raise HTTPException(
