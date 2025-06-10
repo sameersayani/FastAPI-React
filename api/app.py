@@ -11,7 +11,7 @@ from starlette.staticfiles import StaticFiles
 from fastapi.encoders import jsonable_encoder
 from fastapi.templating import Jinja2Templates
 from tortoise.contrib.fastapi import register_tortoise
-from .models import (
+from models import (
     DailyExpenseUpdate,
     expensetpye_pydantic, expensetpye_pydantic_in, ExpenseType, ExpenseTypeUpdate,
     daily_expense_pydantic, daily_expense_pydantic_in,
